@@ -3,6 +3,7 @@ name = "taylorgan"
 version = "0.1.0"
 description = "Source code of our NeurIPS 2020 poster paper TaylorGAN: Neighbor-Augmented Policy Update Towards Sample-Efficient Natural Language Generation"
 authors = ["noobOriented <jsaon92@gmail.com>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -18,7 +19,7 @@ pyyaml = "*"
 flexparse = { git = "https://github.com/noobOriented/flexparse.git", branch = "main" }
 torch = "^1.7.1"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 "flake8-config-yoctol" = "^0.0.11"
 ipdb = "*"
 pytest = "*"
