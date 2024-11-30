@@ -20,7 +20,7 @@ flexparse = { git = "https://github.com/noobOriented/flexparse.git", branch = "m
 torch = "^1.7.1"
 
 [tool.poetry.group.dev.dependencies]
-"flake8-config-yoctol" = "^0.0.11"
+wemake-python-styleguide = ">=0.17"
 ipdb = "*"
 pytest = "*"
 pytest-cov = "*"
