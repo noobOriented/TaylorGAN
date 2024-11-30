@@ -5,7 +5,7 @@ description = "Source code of our NeurIPS 2020 poster paper TaylorGAN: Neighbor-
 authors = ["noobOriented <jsaon92@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "3.6.9"
+python = "^3.12"
 python-dotenv = "*"
 more-itertools = "*"
 tensorboardx = "*"
