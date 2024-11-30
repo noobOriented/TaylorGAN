@@ -1,3 +1,4 @@
+import functools
 import time
 import warnings
 from pathlib import Path
@@ -13,7 +14,6 @@ from core.train.callbacks import (
     TensorBoardXWritter,
     TrainProfiler,
 )
-from library.utils import cached_property
 
 from .evaluator_creator import EvaluatorCreator
 
@@ -106,6 +106,6 @@ class CallbackCreator:
                 stop_training_when_finish=True,
             )
 
-    @cached_property
+    @functools.cached_property
     def text_generator(self):
         return TextGenerator(self.generator, tokenizer=self.meta_data.tokenizer)

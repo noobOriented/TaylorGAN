@@ -1,3 +1,5 @@
+import functools
+
 import torch
 
 from core.models import Discriminator
@@ -13,7 +15,6 @@ from core.objectives.GAN import (
 from core.train import DiscriminatorUpdater, GANTrainer
 from factories.modules import discriminator_factory
 from flexparse import create_action, LookUp, LookUpCall, IntRange
-from library.utils import cached_property
 
 from ..utils import create_factory_action
 from .trainer_factory import TrainerCreator, create_optimizer_action_of
@@ -42,7 +43,7 @@ class GANCreator(TrainerCreator):
             ],
         )
 
-    @cached_property
+    @functools.cached_property
     def objective(self):
         loss_tuple, estimator = self.args[GAN_ARGS[:2]]
         return GANObjective(
@@ -51,7 +52,7 @@ class GANCreator(TrainerCreator):
             estimator=estimator,
         )
 
-    @cached_property
+    @functools.cached_property
     def _discriminator(self) -> Discriminator:
         return discriminator_factory.create(self.args, self.meta_data)
 

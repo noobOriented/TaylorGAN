@@ -1,7 +1,8 @@
+import functools
+
 import torch
 
 from library.torch_zoo.functions import takewhile_mask, random_choice_by_logits
-from library.utils import cached_property
 
 
 class TokenSequence:
@@ -24,7 +25,7 @@ class TokenSequence:
     def maxlen(self) -> int:
         return self.ids.shape[1]
 
-    @cached_property
+    @functools.cached_property
     def length(self) -> torch.Tensor:
         if self.mask is None:
             return self.maxlen
@@ -52,11 +53,11 @@ class SampledTokenSequence(TokenSequence):
     def vocab_size(self) -> int:
         return self.logits.shape[-1]
 
-    @cached_property
+    @functools.cached_property
     def probs(self) -> torch.Tensor:
         return torch.nn.functional.softmax(self.logits, dim=-1)
 
-    @cached_property
+    @functools.cached_property
     def seq_neg_logprobs(self) -> torch.Tensor:
         return seq_neg_logprobs(self.logits, self.ids, mask=self.mask)  # (N, )
 

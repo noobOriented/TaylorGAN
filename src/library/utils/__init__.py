@@ -1,6 +1,5 @@
 from .array_utils import safe_divide, get_seqlens, unpad, random_sample
 from .cache_utils import (
-    cached_property,
     FileCache,
     NumpyCache,
     PickleCache,
