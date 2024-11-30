@@ -1,10 +1,10 @@
-import pytest
-
 import numpy as np
+import pytest
 import tensorflow as tf
 from tensorflow.python.framework import graph_util
 
 from library.tf_keras_zoo.networks import Sequential
+
 from ..embeddings import Embedding, OutputEmbedding
 
 

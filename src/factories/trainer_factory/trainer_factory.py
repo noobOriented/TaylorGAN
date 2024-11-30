@@ -1,11 +1,12 @@
 import abc
+
 import torch
+from flexparse import ArgumentParser, LookUpCall
 
 from core.models import Generator
 from core.train import GeneratorUpdater, Trainer
 from core.train.optimizer import OptimizerWrapper
 from factories.modules import generator_factory
-from flexparse import ArgumentParser, LookUpCall
 from library.utils import ArgumentBinder
 
 from ..utils import create_factory_action

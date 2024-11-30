@@ -4,11 +4,7 @@ import numpy as np
 import pytest
 
 from ..cache_utils import (
-    PickleCache,
-    NumpyCache,
-    JSONSerializableMixin,
-    JSONCache,
-    reuse_method_call,
+    JSONCache, JSONSerializableMixin, NumpyCache, PickleCache, reuse_method_call,
 )
 
 

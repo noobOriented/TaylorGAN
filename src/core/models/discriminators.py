@@ -1,8 +1,8 @@
 import torch
 from torch.nn import Embedding, Linear, Module
 
-from .sequence_modeling import TokenSequence
 from .interfaces import ModuleInterface
+from .sequence_modeling import TokenSequence
 
 
 class Discriminator(Module, ModuleInterface):

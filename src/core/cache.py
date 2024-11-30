@@ -4,7 +4,7 @@ import warnings
 
 from dotenv import load_dotenv
 
-from library.utils import PickleCache, NumpyCache, JSONCache
+from library.utils import JSONCache, NumpyCache, PickleCache
 
 
 class CacheCenter:

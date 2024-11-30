@@ -1,5 +1,4 @@
 import pytest
-
 import tensorflow as tf
 
 from ..sequential import Sequential

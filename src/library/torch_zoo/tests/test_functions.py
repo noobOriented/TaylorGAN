@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from ..functions import takewhile_mask, random_choice_by_logits
+from ..functions import random_choice_by_logits, takewhile_mask
 
 
 def test_takewhile_mask():

@@ -5,10 +5,10 @@ import numpy as np
 from more_itertools import with_iter
 
 from core.cache import cache_center
-from library.utils import logging_indent, tqdm_open, format_path
+from library.utils import format_path, logging_indent, tqdm_open
 
 from .config_objects import CorpusConfig
-from .record_objects import DataCollection, TextDataset, MetaData
+from .record_objects import DataCollection, MetaData, TextDataset
 from .tokenizers import UttutTokenizer
 
 

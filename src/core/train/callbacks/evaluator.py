@@ -1,7 +1,7 @@
 from functools import partialmethod
 
 from core.evaluate import TextGenerator
-from library.utils import reuse_method_call, logging_indent
+from library.utils import logging_indent, reuse_method_call
 
 from .base import Callback
 from .channels import MessageChannel

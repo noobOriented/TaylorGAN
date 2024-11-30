@@ -1,5 +1,6 @@
-from library.tf_keras_zoo.networks import Model
 from tensorflow.python.keras.engine.base_layer import InputSpec
+
+from library.tf_keras_zoo.networks import Model
 
 from .masking import MaskConv1D
 

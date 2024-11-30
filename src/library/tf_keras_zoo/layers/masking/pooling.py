@@ -2,7 +2,7 @@ import abc
 
 import tensorflow as tf
 
-from .utils import apply_mask, ComputeOutputMaskMixin1D
+from .utils import ComputeOutputMaskMixin1D, apply_mask
 
 
 _LARGE_BIAS = 1e4

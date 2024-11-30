@@ -1,20 +1,17 @@
 import torch
+from flexparse import LookUpCall, Namespace, create_action
 from torch.nn import Embedding, Linear
 
 from core.models import Discriminator
 from core.objectives.regularizers import (
-    LossScaler,
-    SpectralRegularizer,
-    EmbeddingRegularizer,
-    GradientPenaltyRegularizer,
-    WordVectorRegularizer,
+    EmbeddingRegularizer, GradientPenaltyRegularizer,
+    LossScaler, SpectralRegularizer, WordVectorRegularizer,
 )
-from flexparse import create_action, Namespace, LookUpCall
-from library.torch_zoo.nn import activations, LambdaModule
-from library.torch_zoo.nn.resnet import ResBlock
+from library.torch_zoo.nn import LambdaModule, activations
 from library.torch_zoo.nn.masking import (
-    MaskConv1d, MaskAvgPool1d, MaskGlobalAvgPool1d, MaskSequential,
+    MaskAvgPool1d, MaskConv1d, MaskGlobalAvgPool1d, MaskSequential,
 )
+from library.torch_zoo.nn.resnet import ResBlock
 from library.utils import ArgumentBinder, NamedObject
 
 from ..utils import create_factory_action

@@ -4,14 +4,11 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from library.tf_keras_zoo.layers import Dense, Lambda, LSTM, Conv1D
+from library.tf_keras_zoo.layers import LSTM, Conv1D, Dense, Lambda
 from library.tf_keras_zoo.networks import Sequential
 
 from ..functions import (
-    takewhile_mask,
-    random_choice_by_logits,
-    suffix_sum,
-    suffix_sum_with_gradients,
+    random_choice_by_logits, suffix_sum, suffix_sum_with_gradients, takewhile_mask,
 )
 
 

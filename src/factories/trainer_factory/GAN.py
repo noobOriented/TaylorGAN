@@ -1,20 +1,15 @@
 import functools
 
 import torch
+from flexparse import IntRange, LookUp, LookUpCall, create_action
 
 from core.models import Discriminator
 from core.objectives.GAN import (
-    BCE,
-    GANObjective,
-    GANLossTuple,
-    ReinforceEstimator,
-    StraightThroughEstimator,
-    TaylorEstimator,
-    GumbelSoftmaxEstimator,
+    BCE, GANLossTuple, GANObjective, GumbelSoftmaxEstimator,
+    ReinforceEstimator, StraightThroughEstimator, TaylorEstimator,
 )
 from core.train import DiscriminatorUpdater, GANTrainer
 from factories.modules import discriminator_factory
-from flexparse import create_action, LookUp, LookUpCall, IntRange
 
 from ..utils import create_factory_action
 from .trainer_factory import TrainerCreator, create_optimizer_action_of

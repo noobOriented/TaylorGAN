@@ -1,11 +1,4 @@
-from torch.nn import (  # noqa: F401
-    Module,
-    ELU,
-    LeakyReLU,
-    ReLU,
-    GELU,
-    SELU,
-)
+from torch.nn import ELU, GELU, SELU, LeakyReLU, Module, ReLU  # noqa: F401
 
 
 _ACTIVATION_CLS = {

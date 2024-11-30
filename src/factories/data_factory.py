@@ -1,22 +1,17 @@
 import os
-import yaml
 
+import yaml
 from dotenv import load_dotenv
-from flexparse import (
-    SUPPRESS, create_action, IntRange, LookUp, Namespace,
-    ArgumentParser,
-)
+from flexparse import SUPPRESS, ArgumentParser, IntRange, LookUp, Namespace, create_action
 from uttut.pipeline.ops import (
-    EngTokenizer,
-    MergeWhiteSpaceCharacters,
-    StripWhiteSpaceCharacters,
-    Lowercase,
+    EngTokenizer, Lowercase, MergeWhiteSpaceCharacters, StripWhiteSpaceCharacters,
 )
 
 from core.preprocess import UttutPreprocessor
 from core.preprocess.adaptors import UttutPipeline
-from core.preprocess.config_objects import CorpusConfig, LanguageConfig, Namespace as PathNamespace
-from library.utils import format_id, format_path, NamedDict
+from core.preprocess.config_objects import CorpusConfig, LanguageConfig
+from core.preprocess.config_objects import Namespace as PathNamespace
+from library.utils import NamedDict, format_id, format_path
 
 
 load_dotenv('.env')

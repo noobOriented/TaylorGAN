@@ -1,5 +1,6 @@
-import termcolor
 from itertools import chain
+
+import termcolor
 
 from .func_utils import ObjectWrapper
 

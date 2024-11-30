@@ -1,6 +1,6 @@
 import typing as t
 
-from flexparse import ArgumentParser, create_action, Action
+from flexparse import Action, ArgumentParser, create_action
 
 
 def create_factory_action(

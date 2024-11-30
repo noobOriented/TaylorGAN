@@ -1,16 +1,13 @@
 from functools import partial
 
 import torch
+from flexparse import LookUpCall, Namespace, create_action
 from torch.nn import Embedding, GRUCell, Linear, Sequential
 
-from core.models import Generator, AutoRegressiveGenerator
+from core.models import AutoRegressiveGenerator, Generator
 from core.objectives.regularizers import (
-    LossScaler,
-    SpectralRegularizer,
-    EmbeddingRegularizer,
-    EntropyRegularizer,
+    EmbeddingRegularizer, EntropyRegularizer, LossScaler, SpectralRegularizer,
 )
-from flexparse import create_action, Namespace, LookUpCall
 from library.utils import NamedObject
 
 from ..utils import create_factory_action

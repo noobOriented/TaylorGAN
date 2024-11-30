@@ -3,7 +3,8 @@ from functools import lru_cache
 import torch
 
 from core.models import ModuleInterface
-from .base import Regularizer, LossCollection
+
+from .base import LossCollection, Regularizer
 
 
 class VariableRegularizer(Regularizer):

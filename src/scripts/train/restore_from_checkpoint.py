@@ -2,6 +2,7 @@ import os
 import pathlib
 import warnings
 
+
 warnings.simplefilter('ignore', category=FutureWarning)
 
 from core.train.callbacks import ModelCheckpoint
@@ -33,7 +34,8 @@ def main(args):
 
 
 def parse_args(argv):
-    from flexparse import ArgumentParser, SUPPRESS, IntRange
+    from flexparse import SUPPRESS, ArgumentParser, IntRange
+
     from scripts.parsers import save_parser
 
     parser = ArgumentParser(

@@ -1,7 +1,7 @@
 from tqdm import tqdm
 
 from core.train.pubsub_base import Subscriber
-from library.utils import left_aligned, format_highlight2, ExponentialMovingAverageMeter
+from library.utils import ExponentialMovingAverageMeter, format_highlight2, left_aligned
 from library.utils.logging import SEPARATION_LINE, TqdmRedirector
 
 from .base import Callback

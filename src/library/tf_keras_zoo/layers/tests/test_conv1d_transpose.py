@@ -1,6 +1,5 @@
-import pytest
-
 import numpy as np
+import pytest
 import tensorflow as tf
 
 from ..conv1d_transpose import Conv1DTranspose

@@ -6,12 +6,7 @@ from pathlib import Path
 from core.evaluate import TextGenerator
 from core.preprocess import MetaData
 from core.train.callbacks import (
-    CallbackList,
-    ModelCheckpoint,
-    ModelSaver,
-    ProgbarLogger,
-    TensorBoardXWritter,
-    TrainProfiler,
+    CallbackList, ModelCheckpoint, ModelSaver, ProgbarLogger, TensorBoardXWritter, TrainProfiler,
 )
 
 from .evaluator_creator import EvaluatorCreator

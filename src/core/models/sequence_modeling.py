@@ -2,7 +2,7 @@ import functools
 
 import torch
 
-from library.torch_zoo.functions import takewhile_mask, random_choice_by_logits
+from library.torch_zoo.functions import random_choice_by_logits, takewhile_mask
 
 
 class TokenSequence:

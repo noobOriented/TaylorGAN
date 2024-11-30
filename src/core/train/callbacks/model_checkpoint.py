@@ -2,9 +2,8 @@ import os
 import sys
 from pathlib import Path
 
-from library.utils import format_path
-
 from core.train.trainers import Trainer
+from library.utils import format_path
 
 from .base import Callback
 

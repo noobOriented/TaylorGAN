@@ -1,19 +1,13 @@
 import operator
 
 from tensorflow.contrib.nn import conv1d_transpose
-
 from tensorflow.python.eager import context
 from tensorflow.python.framework import tensor_shape
-from tensorflow.python.keras import activations
-from tensorflow.python.keras import constraints
-from tensorflow.python.keras import initializers
-from tensorflow.python.keras import regularizers
+from tensorflow.python.keras import activations, constraints, initializers, regularizers
 from tensorflow.python.keras.engine.base_layer import InputSpec
 from tensorflow.python.keras.layers.convolutional import Conv1D
 from tensorflow.python.keras.utils import conv_utils
-
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import nn
+from tensorflow.python.ops import array_ops, nn
 
 
 class Conv1DTranspose(Conv1D):

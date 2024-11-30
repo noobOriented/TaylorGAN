@@ -1,11 +1,13 @@
 import os
 import warnings
 
+
 warnings.simplefilter('ignore', category=FutureWarning)
 
-from core.evaluate import BLEUCalculator, SmoothingFunction, FEDCalculator
+from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
 from factories import data_factory
 from library.utils import random_sample
+
 
 # HUB_URL = "https://tfhub.dev/google/universal-sentence-encoder-large/3"
 HUB_URL = "https://tfhub.dev/google/universal-sentence-encoder/2"
@@ -96,7 +98,8 @@ class FEDMetrics:
 
 def parse_args(argv):
     from flexparse import ArgumentParser
-    from scripts.parsers import evaluate_parser, develop_parser
+
+    from scripts.parsers import develop_parser, evaluate_parser
 
     parser = ArgumentParser(parents=[
         data_factory.PARSER,

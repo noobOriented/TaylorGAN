@@ -1,8 +1,8 @@
 from tensorflow.python.eager import context
 from tensorflow.python.framework import ops
+from tensorflow.python.keras.engine import base_layer
 from tensorflow.python.keras.engine.network import Network
 from tensorflow.python.keras.engine.sequential import Sequential as keras_Sequential
-from tensorflow.python.keras.engine import base_layer
 from tensorflow.python.keras.utils import generic_utils
 from tensorflow.python.training.checkpointable import base as checkpointable
 from tensorflow.python.util import tf_inspect

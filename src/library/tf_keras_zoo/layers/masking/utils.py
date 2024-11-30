@@ -1,7 +1,6 @@
 import re
 
 import tensorflow as tf
-
 from tensorflow.python.keras.utils import conv_utils
 from tensorflow.python.ops import nn_ops
 

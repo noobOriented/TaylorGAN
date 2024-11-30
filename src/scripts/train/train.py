@@ -1,11 +1,12 @@
 import warnings
 
+
 warnings.simplefilter('ignore', category=FutureWarning)
 
-from library.utils import logging_indent
 from core.train import DataLoader
 from core.train.callbacks import ModelCheckpoint
 from factories import callback_factory, data_factory, generator_factory, trainer_factory
+from library.utils import logging_indent
 from scripts.snippets import set_global_random_seed
 
 
@@ -51,12 +52,9 @@ def main(args, base_tag=None, checkpoint=None):
 def parse_args(argv, algorithm):
     from flexparse import ArgumentParser
     from flexparse.formatters import RawTextHelpFormatter
+
     from scripts.parsers import (
-        train_parser,
-        evaluate_parser,
-        save_parser,
-        logging_parser,
-        develop_parser,
+        develop_parser, evaluate_parser, logging_parser, save_parser, train_parser,
     )
 
     parser = ArgumentParser(

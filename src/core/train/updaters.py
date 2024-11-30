@@ -1,10 +1,10 @@
 import abc
-from more_itertools import first
 
 import torch
+from more_itertools import first
 
-from core.models import Generator, Discriminator
-from library.utils import format_id, reuse_method_call, logging_indent
+from core.models import Discriminator, Generator
+from library.utils import format_id, logging_indent, reuse_method_call
 
 from .optimizer import OptimizerWrapper
 from .pubsub_base import Subject

@@ -1,14 +1,11 @@
-import pytest
 from unittest.mock import patch
 
 import numpy as np
+import pytest
 import tensorflow as tf
 
 from ..pooling import (
-    MaskAveragePooling1D,
-    MaskMaxPooling1D,
-    MaskGlobalAveragePooling1D,
-    MaskGlobalMaxPooling1D,
+    MaskAveragePooling1D, MaskGlobalAveragePooling1D, MaskGlobalMaxPooling1D, MaskMaxPooling1D,
 )
 
 

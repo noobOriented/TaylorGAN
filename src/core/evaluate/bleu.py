@@ -4,8 +4,8 @@ from collections import Counter, defaultdict
 import numpy as np
 from tqdm import tqdm
 
-from library.utils import counter_or, get_seqlens, unpad, safe_divide
 from core.cache import cache_center
+from library.utils import counter_or, get_seqlens, safe_divide, unpad
 
 
 class BLEUCalculator:

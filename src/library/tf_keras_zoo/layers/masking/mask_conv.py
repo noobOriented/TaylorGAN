@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from .utils import apply_mask, ComputeOutputMaskMixin1D
+from .utils import ComputeOutputMaskMixin1D, apply_mask
 
 
 class MaskConv1D(ComputeOutputMaskMixin1D, tf.keras.layers.Conv1D):

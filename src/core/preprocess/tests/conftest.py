@@ -1,9 +1,6 @@
 import pytest
 from uttut.pipeline.ops import (
-    EngTokenizer,
-    MergeWhiteSpaceCharacters,
-    StripWhiteSpaceCharacters,
-    Lowercase,
+    EngTokenizer, Lowercase, MergeWhiteSpaceCharacters, StripWhiteSpaceCharacters,
 )
 
 from ..adaptors import UttutPipeline

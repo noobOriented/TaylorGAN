@@ -1,4 +1,4 @@
-from ..collections import counter_or, ExponentialMovingAverageMeter
+from ..collections import ExponentialMovingAverageMeter, counter_or
 
 
 def test_counter_or():

@@ -1,9 +1,9 @@
 import torch
 
-from core.models import Generator, Discriminator
+from core.models import Discriminator, Generator
 from library.torch_zoo.functions import masked_reduce
 
-from .base import Regularizer, LossCollection
+from .base import LossCollection, Regularizer
 
 
 class WordVectorRegularizer(Regularizer):

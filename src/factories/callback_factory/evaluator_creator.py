@@ -1,11 +1,10 @@
+import numpy as np
 from termcolor import colored
 
-import numpy as np
-
+from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
 from core.train.callbacks import TextEvaluator
-from core.evaluate import SmoothingFunction, BLEUCalculator, FEDCalculator
 from core.train.callbacks.channels import register_channel
-from library.utils import logging_indent, random_sample, get_seqlens, SEPARATION_LINE
+from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
 
 
 class EvaluatorCreator:
