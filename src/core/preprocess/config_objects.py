@@ -1,15 +1,11 @@
 import os
+import typing as t
 from collections import namedtuple
-from typing import Callable, List, Union
 
 from more_itertools import all_unique, with_iter
-from uttut.pipeline.ops import (
-    CharTokenizer,
-    MergeWhiteSpaceCharacters,
-    StripWhiteSpaceCharacters,
-)
+from uttut.pipeline.ops import CharTokenizer, MergeWhiteSpaceCharacters, StripWhiteSpaceCharacters
 
-from library.utils import logging_indent, tqdm_open, format_path, JSONSerializableMixin
+from library.utils import JSONSerializableMixin, format_path, logging_indent, tqdm_open
 
 from .adaptors import UttutPipeline, WordEmbeddingCollection
 
@@ -33,11 +29,11 @@ class Namespace:
 class LanguageConfig(JSONSerializableMixin):
 
     def __init__(
-            self,
-            embedding_path: str,
-            segmentor: UttutPipeline = None,
-            split_token: str = '',
-        ):
+        self,
+        embedding_path: str,
+        segmentor: UttutPipeline | None = None,
+        split_token: str = '',
+    ):
         self.embedding_path = embedding_path
         if segmentor is None:
             self._segmentor = UttutPipeline([
@@ -75,18 +71,18 @@ class LanguageConfig(JSONSerializableMixin):
 class CorpusConfig:
 
     def __init__(
-            self,
-            path: Union[str, Namespace],
-            language_config: LanguageConfig,
-            maxlen: int = None,  # used when preprocessor.maxlen = None
-            vocab_size: int = None,  # used when preprocessor.vocab_size = None
-        ):
+        self,
+        path: str | Namespace,
+        language_config: LanguageConfig,
+        maxlen: int | None = None,  # used when preprocessor.maxlen = None
+        vocab_size: int | None = None,  # used when preprocessor.vocab_size = None
+    ):
         self.path = path if isinstance(path, Namespace) else Namespace(train=path)
         self.language_config = language_config
         self.maxlen = maxlen
         self.vocab_size = vocab_size
 
-    def iter_train_sentences(self, segmentize_func: Callable[[str], List[str]] = None):
+    def iter_train_sentences(self, segmentize_func: t.Callable[[str], list[str]] = None):
         segmentize_func = segmentize_func or self.language_config.segmentize_text
         return map(segmentize_func, with_iter(tqdm_open(self.path.train)))
 

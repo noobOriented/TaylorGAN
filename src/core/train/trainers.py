@@ -1,11 +1,12 @@
 import abc
-from typing import Iterator
+import typing as t
 
 import numpy as np
 import torch
 
 from core.models.sequence_modeling import TokenSequence
-from .updaters import GeneratorUpdater, DiscriminatorUpdater
+
+from .updaters import DiscriminatorUpdater, GeneratorUpdater
 
 
 class Trainer(abc.ABC):
@@ -14,7 +15,7 @@ class Trainer(abc.ABC):
         self.generator_updater = generator_updater
 
     @abc.abstractmethod
-    def fit(self, data_loader: Iterator[np.ndarray]):
+    def fit(self, data_loader: t.Iterable[np.ndarray]):
         pass
 
     def save_state(self, path):
@@ -37,7 +38,7 @@ class Trainer(abc.ABC):
 
 class NonParametrizedTrainer(Trainer):
 
-    def fit(self, data_loader: Iterator[np.ndarray]):
+    def fit(self, data_loader: t.Iterable[np.ndarray]):
         for batch_data in data_loader:
             real_samples = TokenSequence(
                 torch.from_numpy(batch_data).type(torch.long),
@@ -49,16 +50,16 @@ class NonParametrizedTrainer(Trainer):
 class GANTrainer(Trainer):
 
     def __init__(
-            self,
-            generator_updater: GeneratorUpdater,
-            discriminator_updater: DiscriminatorUpdater,
-            d_steps: int = 1,
-        ):
+        self,
+        generator_updater: GeneratorUpdater,
+        discriminator_updater: DiscriminatorUpdater,
+        d_steps: int = 1,
+    ):
         super().__init__(generator_updater)
         self.discriminator_updater = discriminator_updater
         self.d_steps = d_steps
 
-    def fit(self, data_loader: Iterator[np.ndarray]):
+    def fit(self, data_loader: t.Iterable[np.ndarray]):
         for batch_data in data_loader:
             real_samples = TokenSequence(
                 torch.from_numpy(batch_data).type(torch.long),

@@ -2,7 +2,6 @@ import functools
 import time
 import warnings
 from pathlib import Path
-from typing import List
 
 from core.evaluate import TextGenerator
 from core.preprocess import MetaData
@@ -51,7 +50,7 @@ def create(args, trainer, generator, data_collection, meta_data, base_tag):
 
 class CallbackCreator:
 
-    def __init__(self, generator, data_collection, meta_data: MetaData, tags: List[str]):
+    def __init__(self, generator, data_collection, meta_data: MetaData, tags: list[str]):
         self.generator = generator
         self.data_collection = data_collection
         self.meta_data = meta_data

@@ -1,5 +1,5 @@
+import typing as t
 from collections import Counter, defaultdict
-from typing import Callable
 
 import numpy as np
 from tqdm import tqdm
@@ -13,14 +13,14 @@ class BLEUCalculator:
     INT_DTYPE = np.int32
 
     def __init__(
-            self,
-            references: np.ndarray,
-            max_gram: int = 5,
-            eos_idx: int = 1,
-            smoothing: Callable = None,
-            verbose: bool = False,
-            cache_dir=None,
-        ):
+        self,
+        references: np.ndarray,
+        max_gram: int = 5,
+        eos_idx: int = 1,
+        smoothing: t.Callable | None = None,
+        verbose: bool = False,
+        cache_dir=None,
+    ):
         self.eos_idx = self.INT_DTYPE(eos_idx)
         self.smoothing = smoothing
 

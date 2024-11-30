@@ -1,16 +1,14 @@
 import abc
+import typing as t
 from collections import Counter
 from itertools import chain, takewhile
-from more_itertools import take
-from typing import Iterable, List
 
 import numpy as np
-from more_itertools import unique_everseen
-
+from more_itertools import take, unique_everseen
 from uttut.pipeline.ops import Pad, Token2Index
 from uttut.pipeline.ops.add_end_token import AddEndToken
 
-from library.utils import logging_indent, JSONSerializableMixin
+from library.utils import JSONSerializableMixin, logging_indent
 
 from .adaptors import UttutPipeline
 from .config_objects import CorpusConfig, LanguageConfig, SpecialTokenConfig
@@ -27,19 +25,19 @@ class Tokenizer(abc.ABC, JSONSerializableMixin):
     INT_DTYPE = np.int32
     eos_idx = INT_DTYPE(special_token_config.eos.idx)
 
-    def __init__(self, tokens: List[int], maxlen: int):
+    def __init__(self, tokens: list[int], maxlen: int):
         self.tokens = tokens
         self.maxlen = maxlen
 
-    def texts_to_array(self, texts: Iterable[str]) -> np.ndarray:
+    def texts_to_array(self, texts: t.Iterable[str]) -> np.ndarray:
         return np.array(list(map(self.text_to_ids, texts)), dtype=self.INT_DTYPE)
 
     @abc.abstractmethod
-    def text_to_ids(self, text: str) -> List[int]:
+    def text_to_ids(self, text: str) -> list[int]:
         pass
 
     @abc.abstractmethod
-    def ids_to_text(self, ids: List[int], split: str = None) -> str:
+    def ids_to_text(self, ids: list[int], split: str = None) -> str:
         pass
 
     @property
@@ -55,7 +53,7 @@ class Tokenizer(abc.ABC, JSONSerializableMixin):
 
 class UttutTokenizer(Tokenizer):
 
-    def __init__(self, tokens: List[int], language_config: LanguageConfig, maxlen: int):
+    def __init__(self, tokens: list[int], language_config: LanguageConfig, maxlen: int):
         super().__init__(tokens, maxlen)
         self.language_config = language_config
         self._token_indexer = UttutPipeline([
@@ -71,14 +69,14 @@ class UttutTokenizer(Tokenizer):
         tokens = self.language_config.segmentize_text(text)
         return self._token_indexer.transform_sequence(tokens)
 
-    def ids_to_text(self, ids: List[int], split: str = None) -> str:
+    def ids_to_text(self, ids: list[int], split: str | None = None) -> str:
         if split is None:
             split = self.language_config.split_token
         tokens = [self.tokens[idx] for idx in takewhile(lambda x: x != self.eos_idx, ids)]
         return split.join(tokens)
 
     @classmethod
-    def fit_corpus(cls, corpus_config: CorpusConfig, maxlen: int = None, vocab_size: int = None):
+    def fit_corpus(cls, corpus_config: CorpusConfig, maxlen: int | None = None, vocab_size: int | None = None):
         maxlen = maxlen or corpus_config.maxlen
         if maxlen:
             token_freq = Counter(chain.from_iterable(

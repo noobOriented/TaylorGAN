@@ -1,17 +1,16 @@
-from typing import Dict, List
+import typing as t
 
 import numpy as np
 import umsgpack
-
-from uttut.pipeline.pipe import Pipe
 from uttut.pipeline.ops import Operator
+from uttut.pipeline.pipe import Pipe
 
 from library.utils import JSONSerializableMixin, ObjectWrapper
 
 
 class UttutPipeline(JSONSerializableMixin, ObjectWrapper):
 
-    def __init__(self, ops: List[Operator] = ()):
+    def __init__(self, ops: t.Sequence[Operator] = ()):
         pipe = Pipe()
         for op in ops:
             pipe.add_op(op)
@@ -40,7 +39,7 @@ class WordEmbeddingCollection:
     DTYPE = np.float32
     UNK = '<unk>'
 
-    def __init__(self, token2index: Dict[str, int], vectors: List[List[float]]):
+    def __init__(self, token2index: dict[str, int], vectors: list[list[float]]):
         self.token2index = token2index
         self.vectors = np.asarray(vectors, self.DTYPE)
 
@@ -50,7 +49,7 @@ class WordEmbeddingCollection:
             params = umsgpack.unpack(f_in)
         return cls(token2index=params['token2index'], vectors=params['vector'])
 
-    def get_matrix_of_tokens(self, token_list: List[str]):
+    def get_matrix_of_tokens(self, token_list: list[str]):
         return np.array(list(map(self.get_vector_of_token, token_list)))
 
     def get_vector_of_token(self, token: str):

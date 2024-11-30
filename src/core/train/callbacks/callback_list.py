@@ -1,11 +1,9 @@
-from typing import List
-
 from .base import Callback
 
 
 class CallbackList(Callback):
 
-    def __init__(self, callbacks: List[Callback]):
+    def __init__(self, callbacks: list[Callback]):
         self.callbacks = callbacks
 
     def on_train_begin(self, is_restored: bool):

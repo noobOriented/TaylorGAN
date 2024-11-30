@@ -1,25 +1,25 @@
+import typing as t
+
 import numpy as np
 import tensorflow as tf
-from typing import Sequence, Union
-
 from tensorflow.python.keras.utils import tf_utils
 
 
 class Embedding(tf.keras.layers.Embedding):
 
     def __init__(
-            self,
-            vocab_size,
-            embeddings_dim,
-            embeddings_initializer='uniform',
-            embeddings_regularizer=None,
-            activity_regularizer=None,
-            embeddings_constraint=None,
-            mask_index: Union[int, Sequence[int]] = None,
-            input_length: int = None,
-            dropout: float = None,
-            **kwargs,
-        ):
+        self,
+        vocab_size,
+        embeddings_dim,
+        embeddings_initializer='uniform',
+        embeddings_regularizer=None,
+        activity_regularizer=None,
+        embeddings_constraint=None,
+        mask_index: int | t.Sequence[int] | None = None,
+        input_length: int = None,
+        dropout: float = None,
+        **kwargs,
+    ):
         if 'input_shape' not in kwargs:
             if input_length:
                 kwargs['input_shape'] = (input_length,)

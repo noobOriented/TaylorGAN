@@ -3,7 +3,6 @@ import os
 import pickle
 from contextlib import contextmanager
 from functools import wraps, lru_cache
-from typing import List
 
 import numpy as np
 
@@ -135,7 +134,7 @@ class JSONCache(FileCache):
 
 
 @contextmanager
-def reuse_method_call(obj, methods: List[str]):
+def reuse_method_call(obj, methods: list[str]):
     wrapped_obj = ObjectWrapper(obj)
     for method_name in methods:
         old_method = getattr(obj, method_name)

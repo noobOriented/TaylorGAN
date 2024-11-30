@@ -1,5 +1,4 @@
 from termcolor import colored
-from typing import List
 
 import numpy as np
 
@@ -30,7 +29,7 @@ class EvaluatorCreator:
         def mean_length(word_ids):
             return {'mean_length': np.mean(get_seqlens(word_ids, self.meta_data.eos_idx))}
 
-        def log_texts(texts: List[str]):
+        def log_texts(texts: list[str]):
             print(SEPARATION_LINE)
             print()
             print(colored("Real Sentences (Random Sampled):", 'blue'))
@@ -104,7 +103,7 @@ class EvaluatorCreator:
             )
 
 
-def print_samples(texts: List[str]):
+def print_samples(texts: list[str]):
     for i, line in enumerate(texts, 1):
         print(f"{i}.")
         print(line)

@@ -1,15 +1,15 @@
-from typing import List
+import typing as t
 
 from flexparse import ArgumentParser, create_action, Action
 
 
 def create_factory_action(
-        *args,
-        type: callable,  # noqa
-        help_prefix: str = '',
-        default=None,
-        **kwargs,
-    ) -> Action:
+    *args,
+    type: t.Callable,  # noqa
+    help_prefix: str = '',
+    default=None,
+    **kwargs,
+) -> Action:
     return create_action(
         *args,
         type=type,
@@ -22,11 +22,11 @@ def create_factory_action(
 
 
 def parent_parser(
-        title: str,
-        description: str,
-        arguments: List[Action],
-        **kwargs,
-    ) -> ArgumentParser:
+    title: str,
+    description: str,
+    arguments: list[Action],
+    **kwargs,
+) -> ArgumentParser:
     parser = ArgumentParser(add_help=False, **kwargs)
     group = parser.add_argument_group(title, description=description)
     for action in arguments:

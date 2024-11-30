@@ -1,5 +1,3 @@
-from typing import List
-
 import numpy as np
 import torch
 
@@ -17,7 +15,7 @@ class TextGenerator:
         self.generator = generator
         self._tokenizer = tokenizer
 
-    def generate_texts(self, size: int, temperature: float = 1.) -> List[str]:
+    def generate_texts(self, size: int, temperature: float = 1.) -> list[str]:
         return list(map(
             self._tokenizer.ids_to_text,
             self.generate_ids(size, temperature),

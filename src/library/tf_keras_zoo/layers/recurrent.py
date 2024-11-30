@@ -1,5 +1,4 @@
 from itertools import chain
-from typing import List
 
 import tensorflow as tf
 from tensorflow.python.keras.utils import tf_utils
@@ -13,7 +12,7 @@ class GRUCell(tf.keras.layers.GRUCell):
 
 class SkipConnectCells(tf.keras.layers.Layer):
 
-    def __init__(self, cells: List[tf.keras.layers.Layer], merge_mode='concat'):
+    def __init__(self, cells: list[tf.keras.layers.Layer], merge_mode='concat'):
         super().__init__()
         self.cells = cells
         if merge_mode not in ('add', 'concat'):
