@@ -1,9 +1,5 @@
 import os
 import pathlib
-import warnings
-
-
-warnings.simplefilter('ignore', category=FutureWarning)
 
 from core.train.callbacks import ModelCheckpoint
 from factories.trainer_factory.GAN import GANCreator

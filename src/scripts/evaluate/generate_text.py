@@ -1,8 +1,4 @@
 import pathlib
-import warnings
-
-
-warnings.simplefilter('ignore', category=FutureWarning)
 
 from core.evaluate import TextGenerator
 from core.preprocess import Tokenizer

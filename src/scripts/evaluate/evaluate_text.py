@@ -1,8 +1,4 @@
 import os
-import warnings
-
-
-warnings.simplefilter('ignore', category=FutureWarning)
 
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
 from factories import data_factory

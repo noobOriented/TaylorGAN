@@ -1,8 +1,3 @@
-import warnings
-
-
-warnings.simplefilter('ignore', category=FutureWarning)
-
 from core.evaluate import TextGenerator
 from factories import data_factory
 

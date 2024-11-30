@@ -1,8 +1,3 @@
-import warnings
-
-
-warnings.simplefilter('ignore', category=FutureWarning)
-
 from core.train import DataLoader
 from core.train.callbacks import ModelCheckpoint
 from factories import callback_factory, data_factory, generator_factory, trainer_factory
