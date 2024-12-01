@@ -5,13 +5,9 @@ from dotenv import load_dotenv
 from flexparse import SUPPRESS, ArgumentParser, IntRange, LookUp, Namespace, create_action
 
 from core.preprocess import UttutPreprocessor
-from core.preprocess.adaptors import UttutPipeline
 from core.preprocess.config_objects import CorpusConfig, LanguageConfig
 from core.preprocess.record_objects import MetaData, TextDataset
 from library.utils import NamedDict, format_id, format_path
-from uttut.pipeline.ops import (
-    EngTokenizer, Lowercase, MergeWhiteSpaceCharacters, StripWhiteSpaceCharacters,
-)
 
 
 load_dotenv('.env')
