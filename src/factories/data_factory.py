@@ -20,12 +20,6 @@ CONFIG_PATH = 'datasets/corpus.yaml'
 LANGUAGE_CONFIGS = {
     'english': LanguageConfig(
         embedding_path=os.getenv('PRETRAINED_EN_WORD_FASTTEXT_PATH'),
-        segmentor=UttutPipeline([
-            MergeWhiteSpaceCharacters(),
-            StripWhiteSpaceCharacters(),
-            Lowercase(),
-            EngTokenizer(),
-        ]),
         split_token=' ',
     ),
     'test': LanguageConfig(

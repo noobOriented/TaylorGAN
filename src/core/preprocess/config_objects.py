@@ -4,7 +4,9 @@ import typing as t
 import more_itertools
 
 from library.utils import JSONSerializableMixin, format_path, logging_indent, tqdm_open
-from uttut.pipeline.ops import CharTokenizer, MergeWhiteSpaceCharacters, StripWhiteSpaceCharacters
+from uttut.pipeline.ops import (
+    EngTokenizer, Lowercase, MergeWhiteSpaceCharacters, StripWhiteSpaceCharacters,
+)
 
 from .adaptors import UttutPipeline, WordEmbeddingCollection
 
@@ -14,18 +16,15 @@ class LanguageConfig(JSONSerializableMixin):
     def __init__(
         self,
         embedding_path: str | None,
-        segmentor: UttutPipeline[str, list[str]] | None = None,
         split_token: str = '',
     ):
         self.embedding_path = embedding_path
-        if segmentor is None:
-            segmentor = UttutPipeline([
-                MergeWhiteSpaceCharacters(),
-                StripWhiteSpaceCharacters(),
-                CharTokenizer(),
-            ])
-
-        self._segmentor = segmentor
+        self._segmentor = UttutPipeline([
+            MergeWhiteSpaceCharacters(),
+            StripWhiteSpaceCharacters(),
+            Lowercase(),
+            EngTokenizer(),
+        ])
         self.split_token = split_token
 
     def segmentize_text(self, text: str) -> list[str]:
@@ -40,13 +39,11 @@ class LanguageConfig(JSONSerializableMixin):
     def get_config(self):
         return {
             'embedding_path': str(self.embedding_path),
-            'segmentor': self._segmentor.serialize(),
             'split_token': self.split_token,
         }
 
     @classmethod
     def from_config(cls, config_dict):
-        config_dict['segmentor'] = UttutPipeline.deserialize(config_dict['segmentor'])
         return cls(**config_dict)
 
 
