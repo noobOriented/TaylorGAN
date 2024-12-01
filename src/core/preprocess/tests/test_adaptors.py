@@ -1,32 +1,6 @@
 import numpy as np
-import pytest
-from uttut.pipeline.ops import CharTokenizer, Pad, Token2Index
 
-from ..adaptors import UttutPipeline, WordEmbeddingCollection
-
-
-class TestUttutPipeline:
-
-    @pytest.fixture(scope='class')
-    def pipe(self):
-        return UttutPipeline([
-            CharTokenizer(),
-            Pad(20, pad_token='<pad>'),
-            Token2Index(
-                {'<sos>': 0, '<eos>': 1, '<unk>': 2, '<pad>': 3, 'a': 4, 'b': 5},
-                unk_token='<unk>',
-            ),
-        ])
-
-    def test_methods(self, pipe):
-        pipe = UttutPipeline()
-        assert callable(pipe.transform_sequence)
-        assert callable(pipe.summary)
-
-    def test_save_load(self, pipe, tmpdir):
-        path = tmpdir / 'test_pipe.json'
-        pipe.save(path)
-        assert UttutPipeline.load(path) == pipe
+from ..adaptors import WordEmbeddingCollection
 
 
 class TestWordEmbeddingCollection:

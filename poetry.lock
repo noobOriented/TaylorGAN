@@ -1639,16 +1639,6 @@ files = [
 ]
 
 [[package]]
-name = "uttut"
-version = "1.4.10"
-description = "Yoctol Utterance processing utilities"
-optional = false
-python-versions = ">=3.5"
-files = [
-    {file = "uttut-1.4.10.tar.gz", hash = "sha256:a0fb3efd88888a241a904346e6a1d095912688d06907e3267ebf7f57618257eb"},
-]
-
-[[package]]
 name = "wcwidth"
 version = "0.2.13"
 description = "Measures the displayed width of unicode strings in a terminal"
@@ -1726,4 +1716,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "459102775c92d86bde8f859a5cdd2c5b12a761a247609ce6f92ae8725f0c639f"
+content-hash = "abf8dba501ee68dbaa98e22dde8c6c3955657f5847e67606e129cc028521c941"

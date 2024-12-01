@@ -3,36 +3,6 @@ import typing as t
 import numpy as np
 import numpy.typing as npt
 import umsgpack
-from uttut.pipeline.ops import Operator
-from uttut.pipeline.pipe import Pipe
-
-from library.utils import JSONSerializableMixin, ObjectWrapper
-
-
-class UttutPipeline[In, Out](JSONSerializableMixin, ObjectWrapper):
-
-    def __init__(self, ops: t.Sequence[Operator] = ()):
-        pipe = Pipe()
-        for op in ops:
-            pipe.add_op(op)
-        self._pipe = pipe
-        super().__init__(pipe)
-
-    @classmethod
-    def from_config(cls, config):
-        pipe = cls()
-        pipe._pipe = Pipe.deserialize(config)
-        return pipe
-
-    def get_config(self):
-        return self._pipe.serialize()
-
-    def transform_sequence(self, sequence: In) -> Out:
-        return self._pipe.transform_sequence(sequence)[0]
-
-    def summary(self):
-        self._pipe.summary()
-        print()
 
 
 class WordEmbeddingCollection:
