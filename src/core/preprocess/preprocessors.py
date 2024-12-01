@@ -8,7 +8,7 @@ from library.utils import format_path, logging_indent, tqdm_open
 
 from .config_objects import CorpusConfig
 from .record_objects import MetaData, TextDataset
-from .tokenizers import Tokenizer, UttutTokenizer
+from .tokenizers import Tokenizer
 
 
 class Preprocessor(abc.ABC):
@@ -34,10 +34,30 @@ class UttutPreprocessor(Preprocessor):
 
     def preprocess(self, corpus_config: CorpusConfig, return_meta: bool = False):
         with logging_indent("Prepare text tokenizer..."):
-            tokenizer = self._create_tokenizer(corpus_config)
+            @cache_center.to_json(self.get_cache_dir(corpus_config) / 'tokenizer.json')
+            def create_tokenizer():
+                print(f'Build text mapper based on corpus data from {format_path(corpus_config.path.train)}')
+                return Tokenizer.fit_corpus(
+                    corpus_config,
+                    maxlen=self.maxlen,
+                    vocab_size=self.vocab_size,
+                )
+
+            tokenizer = create_tokenizer()
 
         with logging_indent("Preprocess text corpus..."):
-            data_collection = self._process_data(tokenizer, corpus_config)
+            data_collection: dict[str, TextDataset] = {}
+            for key, path in corpus_config.path.items():
+                @cache_center.to_npz(self.get_cache_dir(corpus_config) / f'{key}_data.npz')
+                def _process_text_file(filepath):
+                    print(f"Load corpus data from {format_path(filepath)}")
+                    return tokenizer.texts_to_array(with_iter(tqdm_open(filepath)))
+
+                with logging_indent(f"{key} data:", bullet=False):
+                    ids = _process_text_file(path)
+                    texts = list(map(tokenizer.ids_to_text, ids))
+                    text_dataset = TextDataset(ids=ids, texts=texts)
+                    data_collection[key] = text_dataset
 
         if return_meta:
             metadata = MetaData(
@@ -48,35 +68,7 @@ class UttutPreprocessor(Preprocessor):
             return data_collection, metadata
         return data_collection
 
-    def _create_tokenizer(self, corpus_config):
-        @cache_center.to_json(self.get_cache_dir(corpus_config) / 'tokenizer.json')
-        def create_tokenizer():
-            print(f'Build text mapper based on corpus data from {format_path(corpus_config.path.train)}')
-            return UttutTokenizer.fit_corpus(
-                corpus_config,
-                maxlen=self.maxlen,
-                vocab_size=self.vocab_size,
-            )
-
-        return create_tokenizer()
-
-    def _process_data(self, tokenizer: Tokenizer, corpus_config):
-        data_collection: dict[str, TextDataset] = {}
-        for key, path in corpus_config.path.items():
-            @cache_center.to_npz(self.get_cache_dir(corpus_config) / f'{key}_data.npz')
-            def _process_text_file(filepath):
-                print(f"Load corpus data from {format_path(filepath)}")
-                return tokenizer.texts_to_array(with_iter(tqdm_open(filepath)))
-
-            with logging_indent(f"{key} data:", bullet=False):
-                ids = _process_text_file(path)
-                texts = list(map(tokenizer.ids_to_text, ids))
-                text_dataset = TextDataset(ids=ids, texts=texts)
-                data_collection[key] = text_dataset
-
-        return data_collection
-
-    def get_cache_dir(self, corpus_config):
+    def get_cache_dir(self, corpus_config: CorpusConfig):
         items = ["uttut"]
         if self.maxlen:
             items.append(f"L{self.maxlen}")

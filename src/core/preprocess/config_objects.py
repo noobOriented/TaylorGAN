@@ -1,11 +1,10 @@
 import os
 import typing as t
-from collections import namedtuple
 
-from more_itertools import all_unique, with_iter
-from uttut.pipeline.ops import CharTokenizer, MergeWhiteSpaceCharacters, StripWhiteSpaceCharacters
+import more_itertools
 
 from library.utils import JSONSerializableMixin, format_path, logging_indent, tqdm_open
+from uttut.pipeline.ops import CharTokenizer, MergeWhiteSpaceCharacters, StripWhiteSpaceCharacters
 
 from .adaptors import UttutPipeline, WordEmbeddingCollection
 
@@ -67,25 +66,23 @@ class CorpusConfig:
         self.maxlen = maxlen
         self.vocab_size = vocab_size
 
-    def iter_train_sentences(self, segmentize_func: t.Callable[[str], list[str]] | None = None):
-        segmentize_func = segmentize_func or self.language_config.segmentize_text
+    def iter_train_sentences(self) -> t.Iterator[list[str]]:
         with tqdm_open(self.path['train']) as it:
             for s in it:
-                yield segmentize_func(s)
+                yield self.language_config.segmentize_text(s)
 
     def is_valid(self) -> bool:
-        try:
-            return 'train' in self.path and all(map(os.path.isfile, self.path.values()))
-        except TypeError:
-            return False
+        return 'train' in self.path and all(os.path.isfile(p) for p in self.path.values())
 
 
 class SpecialTokenConfig:
 
-    TokenIdxTuple = namedtuple('TokenIdxTuple', ['token', 'idx'])
+    class TokenIdxTuple(t.NamedTuple):
+        token: str
+        idx: int
 
     def __init__(self, **kwargs: str):
-        if not all_unique(kwargs.values()):
+        if not more_itertools.all_unique(kwargs.values()):
             raise KeyError("special tokens conflict.")
 
         self._token_list = list(kwargs.values())
@@ -101,7 +98,7 @@ class SpecialTokenConfig:
     def __getattr__(self, key):
         if key in self._attrs:
             return self._attrs[key]
-        return super().__getattribute__(key)
+        raise AttributeError
 
     def summary(self):
         with logging_indent("Special tokens config:"):

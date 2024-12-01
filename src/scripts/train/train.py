@@ -10,18 +10,18 @@ def main(args, base_tag=None, checkpoint=None):
         set_global_random_seed(args.random_seed)
 
     with logging_indent("Preprocess data"):
-        data_collection, meta_data = data_factory.preprocess(args)
+        data_collection, metadata = data_factory.preprocess(args)
         with logging_indent("Data summary:"):
             for key, array in data_collection.items():
                 print(f"{key} data contains {len(array)} sentences.")
 
-        meta_data.summary()
+        metadata.tokenizer.summary()
 
     with logging_indent("Prepare Generator"):
-        generator = generator_factory.create(args, meta_data)
+        generator = generator_factory.create(args, metadata)
 
     with logging_indent("Prepare Generator Trainer"):
-        trainer = trainer_factory.create(args, meta_data, generator)
+        trainer = trainer_factory.create(args, metadata, generator)
         trainer.summary()
 
     with logging_indent("Prepare Callback"):
@@ -35,7 +35,7 @@ def main(args, base_tag=None, checkpoint=None):
             trainer=trainer,
             generator=generator,
             data_collection=data_collection,
-            metadata=meta_data,
+            metadata=metadata,
             base_tag=base_tag,
         )
 

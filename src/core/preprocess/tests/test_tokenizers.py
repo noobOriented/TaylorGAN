@@ -1,13 +1,13 @@
 import pytest
 
-from ..tokenizers import Tokenizer, UttutTokenizer
+from ..tokenizers import Tokenizer
 
 
-class TestUttutTokenizer:
+class TestTokenizer:
 
     @pytest.fixture(scope='class')
     def tokenizer(self, corpus_config):
-        return UttutTokenizer.fit_corpus(corpus_config)
+        return Tokenizer.fit_corpus(corpus_config)
 
     def test_mapping_consistent(self, tokenizer, corpus_config):
         with open(corpus_config.path.train, 'r') as f:

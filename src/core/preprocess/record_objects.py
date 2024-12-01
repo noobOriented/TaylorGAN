@@ -1,3 +1,5 @@
+import dataclasses
+import pathlib
 import typing as t
 
 import numpy as np
@@ -7,31 +9,29 @@ from core.cache import cache_center
 from core.preprocess.tokenizers import Tokenizer
 from library.utils import logging_indent
 
-from .config_objects import CorpusConfig, LanguageConfig
+from .config_objects import CorpusConfig
 
 
+@dataclasses.dataclass
 class TextDataset:
-
-    def __init__(self, ids: npt.NDArray[np.int_], texts: t.Sequence[str]):
-        self.ids = ids
-        self.texts = texts
+    ids: npt.NDArray[np.int_]
+    texts: t.Sequence[str]
 
     def __len__(self):
         return len(self.ids)
 
 
+@dataclasses.dataclass
 class MetaData:
+    tokenizer: Tokenizer
+    corpus_config: CorpusConfig
+    cache_dir: pathlib.Path
 
-    def __init__(self, tokenizer: Tokenizer, corpus_config: CorpusConfig, cache_dir):
-        self.tokenizer = tokenizer
-        self.corpus_config = corpus_config
-        self.cache_dir = cache_dir
-
-    def load_pretrained_embeddings(self) -> np.ndarray:
+    def load_pretrained_embeddings(self) -> npt.NDArray[np.floating]:
 
         @cache_center.to_npz(self.cache_dir / 'word_vecs.npz')
         def load_embeddings():
-            word_vec_config = self.language_config.load_pretrained_embeddings_msg()
+            word_vec_config = self.corpus_config.language_config.load_pretrained_embeddings_msg()
             return word_vec_config.get_matrix_of_tokens(self.tokenizer.tokens)
 
         with logging_indent("Load pretrained embeddings:"):
@@ -40,25 +40,10 @@ class MetaData:
 
         return embeddings
 
-    def summary(self):
-        self.tokenizer.summary()
-
-    @property
-    def vocab_size(self) -> int:
-        return self.tokenizer.vocab_size
-
-    @property
-    def maxlen(self) -> int:
-        return self.tokenizer.maxlen
-
     @property
     def eos_idx(self) -> int:
-        return self.tokenizer.eos_idx
+        return int(self.tokenizer.eos_idx)
 
     @property
     def special_token_config(self):
         return self.tokenizer.special_token_config
-
-    @property
-    def language_config(self) -> LanguageConfig:
-        return self.corpus_config.language_config
