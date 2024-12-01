@@ -35,7 +35,7 @@ def main(args, base_tag=None, checkpoint=None):
             trainer=trainer,
             generator=generator,
             data_collection=data_collection,
-            meta_data=meta_data,
+            metadata=meta_data,
             base_tag=base_tag,
         )
 

@@ -4,7 +4,7 @@ import numpy as np
 from termcolor import colored
 
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
-from core.preprocess.record_objects import TextDataset
+from core.preprocess.record_objects import MetaData, TextDataset
 from core.train.callbacks import TextEvaluator
 from core.train.callbacks.channels import register_channel
 from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
@@ -12,10 +12,10 @@ from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_s
 
 class EvaluatorCreator:
 
-    def __init__(self, text_generator, data_collection: t.Mapping[str, TextDataset], meta_data):
+    def __init__(self, text_generator, data_collection: t.Mapping[str, TextDataset], metadata: MetaData):
         self.text_generator = text_generator
         self.data_collection = data_collection
-        self.meta_data = meta_data
+        self.metadata = metadata
 
     def create(self, bleu_n_gram, sample_size, fed_sample_size):
         evaluator = TextEvaluator(self.text_generator)
@@ -29,7 +29,7 @@ class EvaluatorCreator:
     def _attach_basic(self, sample_size, evaluator):
 
         def mean_length(word_ids):
-            return {'mean_length': np.mean(get_seqlens(word_ids, self.meta_data.eos_idx))}
+            return {'mean_length': np.mean(get_seqlens(word_ids, self.metadata.eos_idx))}
 
         def log_texts(texts: list[str]):
             print(SEPARATION_LINE)
@@ -56,14 +56,14 @@ class EvaluatorCreator:
     def _attach_bleu(self, max_gram, sample_size, evaluator):
         shared_kwargs = dict(
             max_gram=max_gram,
-            eos_idx=self.meta_data.eos_idx,
+            eos_idx=self.metadata.eos_idx,
             smoothing=SmoothingFunction.fuzz_smoothing,
         )
         for tag, dataset in self.data_collection.items():
             with logging_indent(f"Building '{tag}' data BLEU table..."):
                 calculator = BLEUCalculator(
                     dataset.ids,
-                    cache_dir=self.meta_data.cache_dir / f"{tag}_BLEU",
+                    cache_dir=self.metadata.cache_dir / f"{tag}_BLEU",
                     verbose=True,
                     **shared_kwargs,
                 )

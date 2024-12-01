@@ -3,7 +3,11 @@ import pytest
 from ..tokenizers import Tokenizer, UttutTokenizer
 
 
-class TokenizerTestTemplate:
+class TestUttutTokenizer:
+
+    @pytest.fixture(scope='class')
+    def tokenizer(self, corpus_config):
+        return UttutTokenizer.fit_corpus(corpus_config)
 
     def test_mapping_consistent(self, tokenizer, corpus_config):
         with open(corpus_config.path.train, 'r') as f:
@@ -19,15 +23,7 @@ class TokenizerTestTemplate:
     def test_save_load(self, tokenizer, tmpdir):
         path = tmpdir / 'tokenizer.json'
         tokenizer.save(path)
-        self.assert_equal(tokenizer, Tokenizer.load(path))
+        loaded = Tokenizer.load(path)
 
-
-class TestUttutTokenizer(TokenizerTestTemplate):
-
-    @pytest.fixture(scope='class')
-    def tokenizer(self, corpus_config):
-        return UttutTokenizer.fit_corpus(corpus_config)
-
-    def assert_equal(self, a, b):
-        assert a.tokens == b.tokens
-        assert a.maxlen == b.maxlen
+        assert tokenizer.tokens == loaded.tokens
+        assert tokenizer.maxlen == loaded.maxlen

@@ -1,7 +1,6 @@
 import abc
 import pathlib
-
-import numpy as np
+import typing as t
 from more_itertools import with_iter
 
 from core.cache import cache_center
@@ -21,9 +20,17 @@ class Preprocessor(abc.ABC):
 
 class UttutPreprocessor(Preprocessor):
 
-    def __init__(self, maxlen: int = None, vocab_size: int = None):
+    def __init__(self, maxlen: int | None = None, vocab_size: int | None = None):
         self.maxlen = maxlen
         self.vocab_size = vocab_size
+
+    @t.overload
+    def preprocess(self, corpus_config: CorpusConfig, return_meta: t.Literal[True]) -> tuple[dict[str, TextDataset], MetaData]:
+        ...
+
+    @t.overload
+    def preprocess(self, corpus_config: CorpusConfig, return_meta: bool = False) -> dict[str, TextDataset]:
+        ...
 
     def preprocess(self, corpus_config: CorpusConfig, return_meta: bool = False):
         with logging_indent("Prepare text tokenizer..."):
@@ -33,21 +40,18 @@ class UttutPreprocessor(Preprocessor):
             data_collection = self._process_data(tokenizer, corpus_config)
 
         if return_meta:
-            meta_data = MetaData(
+            metadata = MetaData(
                 tokenizer=tokenizer,
                 corpus_config=corpus_config,
                 cache_dir=self.get_cache_dir(corpus_config),
             )
-            return data_collection, meta_data
+            return data_collection, metadata
         return data_collection
 
     def _create_tokenizer(self, corpus_config):
         @cache_center.to_json(self.get_cache_dir(corpus_config) / 'tokenizer.json')
         def create_tokenizer():
-            print(
-                "Build text mapper based on corpus data "
-                f"from {format_path(corpus_config.path.train)}",
-            )
+            print(f'Build text mapper based on corpus data from {format_path(corpus_config.path.train)}')
             return UttutTokenizer.fit_corpus(
                 corpus_config,
                 maxlen=self.maxlen,

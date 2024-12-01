@@ -4,9 +4,10 @@ import numpy as np
 import numpy.typing as npt
 
 from core.cache import cache_center
+from core.preprocess.tokenizers import Tokenizer
 from library.utils import logging_indent
 
-from .config_objects import LanguageConfig
+from .config_objects import CorpusConfig, LanguageConfig
 
 
 class TextDataset:
@@ -21,7 +22,7 @@ class TextDataset:
 
 class MetaData:
 
-    def __init__(self, tokenizer, corpus_config, cache_dir):
+    def __init__(self, tokenizer: Tokenizer, corpus_config: CorpusConfig, cache_dir):
         self.tokenizer = tokenizer
         self.corpus_config = corpus_config
         self.cache_dir = cache_dir

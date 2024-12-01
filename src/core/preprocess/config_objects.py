@@ -15,7 +15,7 @@ class LanguageConfig(JSONSerializableMixin):
     def __init__(
         self,
         embedding_path: str | None,
-        segmentor: UttutPipeline | None = None,
+        segmentor: UttutPipeline[str, list[str]] | None = None,
         split_token: str = '',
     ):
         self.embedding_path = embedding_path
@@ -29,7 +29,7 @@ class LanguageConfig(JSONSerializableMixin):
         self._segmentor = segmentor
         self.split_token = split_token
 
-    def segmentize_text(self, text):
+    def segmentize_text(self, text: str) -> list[str]:
         return self._segmentor.transform_sequence(text)
 
     def load_pretrained_embeddings_msg(self):
@@ -67,9 +67,11 @@ class CorpusConfig:
         self.maxlen = maxlen
         self.vocab_size = vocab_size
 
-    def iter_train_sentences(self, segmentize_func: t.Callable[[str], list[str]] = None):
+    def iter_train_sentences(self, segmentize_func: t.Callable[[str], list[str]] | None = None):
         segmentize_func = segmentize_func or self.language_config.segmentize_text
-        return map(segmentize_func, with_iter(tqdm_open(self.path['train'])))
+        with tqdm_open(self.path['train']) as it:
+            for s in it:
+                yield segmentize_func(s)
 
     def is_valid(self) -> bool:
         try:
@@ -82,7 +84,7 @@ class SpecialTokenConfig:
 
     TokenIdxTuple = namedtuple('TokenIdxTuple', ['token', 'idx'])
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: str):
         if not all_unique(kwargs.values()):
             raise KeyError("special tokens conflict.")
 
@@ -93,7 +95,7 @@ class SpecialTokenConfig:
         }
 
     @property
-    def tokens(self):
+    def tokens(self) -> list[str]:
         return self._token_list
 
     def __getattr__(self, key):
