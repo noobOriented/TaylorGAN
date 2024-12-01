@@ -10,40 +10,23 @@ from library.utils import JSONSerializableMixin, format_path, logging_indent, tq
 from .adaptors import UttutPipeline, WordEmbeddingCollection
 
 
-class Namespace:
-
-    def __init__(self, **kwargs):
-        for key, val in kwargs.items():
-            setattr(self, key, val)
-
-    def keys(self):
-        return self.__dict__.keys()
-
-    def values(self):
-        return self.__dict__.values()
-
-    def items(self):
-        return self.__dict__.items()
-
-
 class LanguageConfig(JSONSerializableMixin):
 
     def __init__(
         self,
-        embedding_path: str,
+        embedding_path: str | None,
         segmentor: UttutPipeline | None = None,
         split_token: str = '',
     ):
         self.embedding_path = embedding_path
         if segmentor is None:
-            self._segmentor = UttutPipeline([
+            segmentor = UttutPipeline([
                 MergeWhiteSpaceCharacters(),
                 StripWhiteSpaceCharacters(),
                 CharTokenizer(),
             ])
-        else:
-            self._segmentor = segmentor
 
+        self._segmentor = segmentor
         self.split_token = split_token
 
     def segmentize_text(self, text):
@@ -72,23 +55,25 @@ class CorpusConfig:
 
     def __init__(
         self,
-        path: str | Namespace,
+        path: str | t.Mapping[str, str],
         language_config: LanguageConfig,
         maxlen: int | None = None,  # used when preprocessor.maxlen = None
         vocab_size: int | None = None,  # used when preprocessor.vocab_size = None
     ):
-        self.path = path if isinstance(path, Namespace) else Namespace(train=path)
+        if isinstance(path, str):
+            path = {'train': path}
+        self.path = path
         self.language_config = language_config
         self.maxlen = maxlen
         self.vocab_size = vocab_size
 
     def iter_train_sentences(self, segmentize_func: t.Callable[[str], list[str]] = None):
         segmentize_func = segmentize_func or self.language_config.segmentize_text
-        return map(segmentize_func, with_iter(tqdm_open(self.path.train)))
+        return map(segmentize_func, with_iter(tqdm_open(self.path['train'])))
 
-    def is_valid(self):
+    def is_valid(self) -> bool:
         try:
-            return hasattr(self.path, 'train') and all(map(os.path.isfile, self.path.values()))
+            return 'train' in self.path and all(map(os.path.isfile, self.path.values()))
         except TypeError:
             return False
 

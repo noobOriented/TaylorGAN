@@ -4,17 +4,27 @@ import warnings
 from pathlib import Path
 
 from core.evaluate import TextGenerator
+from core.models.generators import Generator
 from core.preprocess import MetaData
+from core.preprocess.record_objects import DataCollection
 from core.train.callbacks import (
     CallbackList, ModelCheckpoint, ModelSaver, ProgbarLogger, TensorBoardXWritter, TrainProfiler,
 )
+from core.train.trainers import Trainer
 
 from .evaluator_creator import EvaluatorCreator
 
 
-def create(args, trainer, generator, data_collection, meta_data, base_tag):
+def create(
+    args,
+    trainer: Trainer,
+    generator: Generator,
+    data_collection: DataCollection,
+    meta_data: MetaData,
+    base_tag: str | None,
+):
     base_tag = base_tag or f"{args.dataset}@{time.strftime('%Y%m%d-%H%M%S')}"
-    creator = CallbackCreator(
+    creator = _CallbackCreator(
         generator=generator,
         data_collection=data_collection,
         meta_data=meta_data,
@@ -43,9 +53,9 @@ def create(args, trainer, generator, data_collection, meta_data, base_tag):
     return callback_list
 
 
-class CallbackCreator:
+class _CallbackCreator:
 
-    def __init__(self, generator, data_collection, meta_data: MetaData, tags: list[str]):
+    def __init__(self, generator, data_collection: DataCollection, meta_data: MetaData, tags: list[str]):
         self.generator = generator
         self.data_collection = data_collection
         self.meta_data = meta_data
@@ -61,7 +71,7 @@ class CallbackCreator:
     def create_loggers(self, updaters, tensorboard_logdir: Path):
         yield ProgbarLogger(
             desc=self.tag,
-            total=len(self.data_collection.train),
+            total=len(self.data_collection['train']),
             updaters=updaters,
         )
         if tensorboard_logdir:

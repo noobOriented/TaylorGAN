@@ -3,15 +3,15 @@ import os
 import yaml
 from dotenv import load_dotenv
 from flexparse import SUPPRESS, ArgumentParser, IntRange, LookUp, Namespace, create_action
-from uttut.pipeline.ops import (
-    EngTokenizer, Lowercase, MergeWhiteSpaceCharacters, StripWhiteSpaceCharacters,
-)
 
 from core.preprocess import UttutPreprocessor
 from core.preprocess.adaptors import UttutPipeline
 from core.preprocess.config_objects import CorpusConfig, LanguageConfig
-from core.preprocess.config_objects import Namespace as PathNamespace
+from core.preprocess.record_objects import DataCollection, MetaData
 from library.utils import NamedDict, format_id, format_path
+from uttut.pipeline.ops import (
+    EngTokenizer, Lowercase, MergeWhiteSpaceCharacters, StripWhiteSpaceCharacters,
+)
 
 
 load_dotenv('.env')
@@ -35,12 +35,12 @@ LANGUAGE_CONFIGS = {
 }
 
 
-def preprocess(args: Namespace, return_meta: bool = False):
+def preprocess(args: Namespace) -> tuple[DataCollection, MetaData]:
     dataset, maxlen, vocab_size = args[ARGS]
     print(f"data_id: {format_id(dataset)}")
     print(f"preprocessor_id {format_id('uttut')}")
     preprocessor = UttutPreprocessor(maxlen=maxlen, vocab_size=vocab_size)
-    return preprocessor.preprocess(dataset, return_meta=return_meta)
+    return preprocessor.preprocess(dataset, return_meta=True)
 
 
 def load_corpus_table(path):
@@ -56,9 +56,9 @@ def load_corpus_table(path):
 
 def parse_config(corpus_dict):
     if isinstance(corpus_dict['path'], dict):
-        path = PathNamespace(**corpus_dict['path'])
+        path = corpus_dict['path']
     else:
-        path = PathNamespace(train=corpus_dict['path'])
+        path = {'train': corpus_dict['path']}
 
     language_id = corpus_dict['language']
     return CorpusConfig(

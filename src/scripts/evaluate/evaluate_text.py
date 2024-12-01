@@ -1,6 +1,7 @@
 import os
 
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
+from core.preprocess.record_objects import DataCollection
 from factories import data_factory
 from library.utils import random_sample
 
@@ -11,7 +12,7 @@ RLM_EPOCHS = 100
 
 
 def main(args):
-    data_collection, meta_data = data_factory.preprocess(args, return_meta=True)
+    data_collection, meta_data = data_factory.preprocess(args)
     tokenizer = meta_data.tokenizer
 
     metric_calcuators = []
@@ -44,7 +45,7 @@ def main(args):
 
 class BLEUMetrics:
 
-    def __init__(self, data_collection, cache_dir, eos_idx=1, max_gram=5):
+    def __init__(self, data_collection: DataCollection, cache_dir, eos_idx=1, max_gram=5):
         self.calculators = {
             tag: BLEUCalculator(
                 dataset.ids,

@@ -1,7 +1,10 @@
+import typing as t
+
 import numpy as np
 from termcolor import colored
 
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
+from core.preprocess.record_objects import DataCollection
 from core.train.callbacks import TextEvaluator
 from core.train.callbacks.channels import register_channel
 from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
@@ -9,7 +12,7 @@ from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_s
 
 class EvaluatorCreator:
 
-    def __init__(self, text_generator, data_collection, meta_data):
+    def __init__(self, text_generator, data_collection: DataCollection, meta_data):
         self.text_generator = text_generator
         self.data_collection = data_collection
         self.meta_data = meta_data
@@ -32,7 +35,7 @@ class EvaluatorCreator:
             print(SEPARATION_LINE)
             print()
             print(colored("Real Sentences (Random Sampled):", 'blue'))
-            print_samples(random_sample(self.data_collection.train.texts, len(texts)))
+            print_samples(random_sample(self.data_collection['train'].texts, len(texts)))
             print()
             print(colored("Fake Sentences (Random Sampled):", 'red'))
             print_samples(texts)
@@ -71,14 +74,14 @@ class EvaluatorCreator:
                 period=10,
             )
 
-        def selfbleu(word_ids) -> callable:
+        def selfbleu(word_ids) -> t.Callable:
             print("Evaluating generated data SelfBLEU...")
             print()
             return BLEUCalculator.selfbleu(word_ids, **shared_kwargs)
 
         evaluator.on_epoch_end.evaluate_ids(
             selfbleu,
-            sample_size=min(10000, 2 * len(self.data_collection.train)),
+            sample_size=min(10000, 2 * len(self.data_collection['train'])),
             channel=register_channel('samples'),
         )
 
@@ -102,7 +105,7 @@ class EvaluatorCreator:
             )
 
 
-def print_samples(texts: list[str]):
+def print_samples(texts: t.Sequence[str]):
     for i, line in enumerate(texts, 1):
         print(f"{i}.")
         print(line)

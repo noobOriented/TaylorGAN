@@ -10,7 +10,7 @@ def main(args, base_tag=None, checkpoint=None):
         set_global_random_seed(args.random_seed)
 
     with logging_indent("Preprocess data"):
-        data_collection, meta_data = data_factory.preprocess(args, return_meta=True)
+        data_collection, meta_data = data_factory.preprocess(args)
         data_collection.summary()
         meta_data.summary()
 
@@ -23,7 +23,7 @@ def main(args, base_tag=None, checkpoint=None):
 
     with logging_indent("Prepare Callback"):
         data_loader = DataLoader(
-            data_collection.train,
+            data_collection['train'],
             batch_size=args.batch_size,
             n_epochs=args.epochs,
         )

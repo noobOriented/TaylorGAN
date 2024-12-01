@@ -1,27 +1,30 @@
+import typing as t
+
 import numpy as np
+import numpy.typing as npt
 
 from core.cache import cache_center
 from library.utils import logging_indent
 
-from .config_objects import LanguageConfig, Namespace
-
-
-class DataCollection(Namespace):
-
-    def summary(self):
-        with logging_indent("Data summary:"):
-            for key, array in self.items():
-                print(f"{key} data contains {len(array)} sentences.")
+from .config_objects import LanguageConfig
 
 
 class TextDataset:
 
-    def __init__(self, ids, texts):
+    def __init__(self, ids: npt.NDArray[np.int_], texts: t.Sequence[str]):
         self.ids = ids
         self.texts = texts
 
     def __len__(self):
         return len(self.ids)
+
+
+class DataCollection(dict[str, TextDataset]):
+
+    def summary(self):
+        with logging_indent("Data summary:"):
+            for key, array in self.items():
+                print(f"{key} data contains {len(array)} sentences.")
 
 
 class MetaData:

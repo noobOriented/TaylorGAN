@@ -1,4 +1,4 @@
-from ..config_objects import CorpusConfig, Namespace
+from ..config_objects import CorpusConfig
 
 
 def test_is_valid(language_config, data_dir):
@@ -18,6 +18,6 @@ def test_isnot_valid(language_config, data_dir):
         language_config=language_config,
     ).is_valid()
     assert not CorpusConfig(
-        path=Namespace(garbage=data_dir / 'train.txt'),
+        path={'garbage': data_dir / 'train.txt'},
         language_config=language_config,
     ).is_valid()

@@ -4,6 +4,7 @@ from collections import Counter
 from itertools import chain, takewhile
 
 import numpy as np
+import numpy.typing as npt
 from more_itertools import take, unique_everseen
 from uttut.pipeline.ops import Pad, Token2Index
 from uttut.pipeline.ops.add_end_token import AddEndToken
@@ -29,19 +30,19 @@ class Tokenizer(abc.ABC, JSONSerializableMixin):
         self.tokens = tokens
         self.maxlen = maxlen
 
-    def texts_to_array(self, texts: t.Iterable[str]) -> np.ndarray:
-        return np.array(list(map(self.text_to_ids, texts)), dtype=self.INT_DTYPE)
+    def texts_to_array(self, texts: t.Iterable[str]) -> npt.NDArray[np.int_]:
+        return np.asarray(list(map(self.text_to_ids, texts)), dtype=self.INT_DTYPE)
 
     @abc.abstractmethod
     def text_to_ids(self, text: str) -> list[int]:
-        pass
+        ...
 
     @abc.abstractmethod
-    def ids_to_text(self, ids: list[int], split: str = None) -> str:
-        pass
+    def ids_to_text(self, ids: list[int], split: str | None = None) -> str:
+        ...
 
     @property
-    def vocab_size(self):
+    def vocab_size(self) -> int:
         return len(self.tokens)
 
     def summary(self):

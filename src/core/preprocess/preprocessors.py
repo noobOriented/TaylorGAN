@@ -9,7 +9,7 @@ from library.utils import format_path, logging_indent, tqdm_open
 
 from .config_objects import CorpusConfig
 from .record_objects import DataCollection, MetaData, TextDataset
-from .tokenizers import UttutTokenizer
+from .tokenizers import Tokenizer, UttutTokenizer
 
 
 class Preprocessor(abc.ABC):
@@ -39,8 +39,7 @@ class UttutPreprocessor(Preprocessor):
                 cache_dir=self.get_cache_dir(corpus_config),
             )
             return data_collection, meta_data
-        else:
-            return data_collection
+        return data_collection
 
     def _create_tokenizer(self, corpus_config):
         @cache_center.to_json(self.get_cache_dir(corpus_config) / 'tokenizer.json')
@@ -57,11 +56,11 @@ class UttutPreprocessor(Preprocessor):
 
         return create_tokenizer()
 
-    def _process_data(self, tokenizer, corpus_config):
+    def _process_data(self, tokenizer: Tokenizer, corpus_config):
         data_collection = DataCollection()
         for key, path in corpus_config.path.items():
             @cache_center.to_npz(self.get_cache_dir(corpus_config) / f'{key}_data.npz')
-            def _process_text_file(filepath) -> np.ndarray:
+            def _process_text_file(filepath):
                 print(f"Load corpus data from {format_path(filepath)}")
                 return tokenizer.texts_to_array(with_iter(tqdm_open(filepath)))
 
@@ -69,7 +68,7 @@ class UttutPreprocessor(Preprocessor):
                 ids = _process_text_file(path)
                 texts = list(map(tokenizer.ids_to_text, ids))
                 text_dataset = TextDataset(ids=ids, texts=texts)
-                setattr(data_collection, key, text_dataset)
+                data_collection[key] = text_dataset
 
         return data_collection
 
