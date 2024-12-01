@@ -1,12 +1,13 @@
 import functools
 import time
 import warnings
+import typing as t
 from pathlib import Path
 
 from core.evaluate import TextGenerator
 from core.models.generators import Generator
 from core.preprocess import MetaData
-from core.preprocess.record_objects import DataCollection
+from core.preprocess.record_objects import TextDataset
 from core.train.callbacks import (
     CallbackList, ModelCheckpoint, ModelSaver, ProgbarLogger, TensorBoardXWritter, TrainProfiler,
 )
@@ -19,7 +20,7 @@ def create(
     args,
     trainer: Trainer,
     generator: Generator,
-    data_collection: DataCollection,
+    data_collection: t.Mapping[str, TextDataset],
     meta_data: MetaData,
     base_tag: str | None,
 ):
@@ -55,7 +56,7 @@ def create(
 
 class _CallbackCreator:
 
-    def __init__(self, generator, data_collection: DataCollection, meta_data: MetaData, tags: list[str]):
+    def __init__(self, generator, data_collection: t.Mapping[str, TextDataset], meta_data: MetaData, tags: list[str]):
         self.generator = generator
         self.data_collection = data_collection
         self.meta_data = meta_data

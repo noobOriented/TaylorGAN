@@ -11,7 +11,10 @@ def main(args, base_tag=None, checkpoint=None):
 
     with logging_indent("Preprocess data"):
         data_collection, meta_data = data_factory.preprocess(args)
-        data_collection.summary()
+        with logging_indent("Data summary:"):
+            for key, array in data_collection.items():
+                print(f"{key} data contains {len(array)} sentences.")
+
         meta_data.summary()
 
     with logging_indent("Prepare Generator"):

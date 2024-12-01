@@ -4,7 +4,7 @@ import numpy as np
 from termcolor import colored
 
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
-from core.preprocess.record_objects import DataCollection
+from core.preprocess.record_objects import TextDataset
 from core.train.callbacks import TextEvaluator
 from core.train.callbacks.channels import register_channel
 from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
@@ -12,7 +12,7 @@ from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_s
 
 class EvaluatorCreator:
 
-    def __init__(self, text_generator, data_collection: DataCollection, meta_data):
+    def __init__(self, text_generator, data_collection: t.Mapping[str, TextDataset], meta_data):
         self.text_generator = text_generator
         self.data_collection = data_collection
         self.meta_data = meta_data

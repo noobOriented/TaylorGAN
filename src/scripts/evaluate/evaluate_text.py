@@ -1,7 +1,8 @@
 import os
+import typing as t
 
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
-from core.preprocess.record_objects import DataCollection
+from core.preprocess.record_objects import TextDataset
 from factories import data_factory
 from library.utils import random_sample
 
@@ -45,7 +46,7 @@ def main(args):
 
 class BLEUMetrics:
 
-    def __init__(self, data_collection: DataCollection, cache_dir, eos_idx=1, max_gram=5):
+    def __init__(self, data_collection: t.Mapping[str, TextDataset], cache_dir, eos_idx=1, max_gram=5):
         self.calculators = {
             tag: BLEUCalculator(
                 dataset.ids,

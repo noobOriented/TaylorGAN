@@ -7,7 +7,7 @@ from flexparse import SUPPRESS, ArgumentParser, IntRange, LookUp, Namespace, cre
 from core.preprocess import UttutPreprocessor
 from core.preprocess.adaptors import UttutPipeline
 from core.preprocess.config_objects import CorpusConfig, LanguageConfig
-from core.preprocess.record_objects import DataCollection, MetaData
+from core.preprocess.record_objects import MetaData, TextDataset
 from library.utils import NamedDict, format_id, format_path
 from uttut.pipeline.ops import (
     EngTokenizer, Lowercase, MergeWhiteSpaceCharacters, StripWhiteSpaceCharacters,
@@ -35,7 +35,7 @@ LANGUAGE_CONFIGS = {
 }
 
 
-def preprocess(args: Namespace) -> tuple[DataCollection, MetaData]:
+def preprocess(args: Namespace) -> tuple[dict[str, TextDataset], MetaData]:
     dataset, maxlen, vocab_size = args[ARGS]
     print(f"data_id: {format_id(dataset)}")
     print(f"preprocessor_id {format_id('uttut')}")

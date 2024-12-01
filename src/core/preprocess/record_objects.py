@@ -19,14 +19,6 @@ class TextDataset:
         return len(self.ids)
 
 
-class DataCollection(dict[str, TextDataset]):
-
-    def summary(self):
-        with logging_indent("Data summary:"):
-            for key, array in self.items():
-                print(f"{key} data contains {len(array)} sentences.")
-
-
 class MetaData:
 
     def __init__(self, tokenizer, corpus_config, cache_dir):

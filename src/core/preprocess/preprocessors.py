@@ -8,7 +8,7 @@ from core.cache import cache_center
 from library.utils import format_path, logging_indent, tqdm_open
 
 from .config_objects import CorpusConfig
-from .record_objects import DataCollection, MetaData, TextDataset
+from .record_objects import MetaData, TextDataset
 from .tokenizers import Tokenizer, UttutTokenizer
 
 
@@ -57,7 +57,7 @@ class UttutPreprocessor(Preprocessor):
         return create_tokenizer()
 
     def _process_data(self, tokenizer: Tokenizer, corpus_config):
-        data_collection = DataCollection()
+        data_collection: dict[str, TextDataset] = {}
         for key, path in corpus_config.path.items():
             @cache_center.to_npz(self.get_cache_dir(corpus_config) / f'{key}_data.npz')
             def _process_text_file(filepath):
