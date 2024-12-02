@@ -1,14 +1,9 @@
-import tensorflow as tf
+import torch
 
-from library.tf_keras_zoo.functions import (
-    compute_advantage,
-    gaussian,
-    masked_reduce,
-    pairwise_euclidean,
-)
 from core.models.discriminators import Discriminator
 from core.models.sequence_modeling import SampledTokenSequence
 from core.objectives.collections import LossCollection
+from library.torch_zoo.functions import gaussian, masked_reduce, pairwise_euclidean
 
 from .base import GANEstimator
 
@@ -17,6 +12,7 @@ class ReinforceEstimator(GANEstimator):
 
     def __init__(self, baseline_decay: float = 0.9):
         self.baseline_decay = baseline_decay
+        self.baseline = None
 
     def compute_loss(
             self,
@@ -26,11 +22,21 @@ class ReinforceEstimator(GANEstimator):
         ):
         score = discriminator.score_samples(fake_samples)
         adv_loss = generator_loss(score)
-        reward = -tf.squeeze(adv_loss, axis=1)  # shape (N, )
+        reward = adv_loss.squeeze(axis=1)  # shape (N, )
 
-        advantage = compute_advantage(reward, decay=self.baseline_decay)  # shape (N, )
-        policy_loss = tf.reduce_mean(tf.stop_gradient(advantage) * fake_samples.seq_neg_logprobs)
-        return LossCollection(policy_loss, adv=tf.reduce_mean(adv_loss))
+        advantage = self.compute_advantage(reward)  # shape (N, )
+        policy_loss = (advantage.detach() * fake_samples.seq_neg_logprobs).mean()
+        return LossCollection(policy_loss, adv=adv_loss.mean())
+
+    def compute_advantage(self, reward):
+        if self.baseline is None:
+            self.baseline = reward.mean()
+
+        advantage = reward - self.baseline
+        self.baseline = (
+            self.baseline * self.baseline_decay + reward.mean() * (1 - self.baseline_decay)
+        )
+        return advantage
 
 
 class TaylorEstimator(GANEstimator):
@@ -38,6 +44,7 @@ class TaylorEstimator(GANEstimator):
     def __init__(self, baseline_decay: float = 0.9, bandwidth: float = 0.5):
         self.baseline_decay = baseline_decay
         self.bandwidth = bandwidth
+        self.baseline = None
 
     def compute_loss(
             self,
@@ -46,7 +53,7 @@ class TaylorEstimator(GANEstimator):
             generator_loss: callable,
         ):
         fake_embeddings = discriminator.get_embedding(word_ids=fake_samples.ids)
-        score = discriminator.score_word_vector(fake_embeddings)
+        score = discriminator.score_word_vector(fake_embeddings, mask=fake_samples.mask)
         adv_loss = generator_loss(score)
         reward = -adv_loss
 
@@ -54,27 +61,47 @@ class TaylorEstimator(GANEstimator):
             y=reward,
             x0=fake_embeddings,
             xs=discriminator.embedding_matrix,
-        )
-        zeroth_order_advantage = compute_advantage(reward, decay=self.baseline_decay)
-        advantage = zeroth_order_advantage[:, :, tf.newaxis] + first_order_reward
+        ).view_as(fake_samples.logits)
+        zeroth_order_advantage = self.compute_advantage(reward)
+        advantage = zeroth_order_advantage.unsqueeze(dim=2) + first_order_reward
 
         square_dist = pairwise_euclidean(discriminator.embedding_matrix)
         kernel = gaussian(square_dist / (self.bandwidth ** 2))  # (V, V)
-        batch_kernel = tf.nn.embedding_lookup(kernel, fake_samples.ids)  # shape (N, T, V)
-        likelihood = tf.tensordot(fake_samples.probs, kernel, axes=[2, 0])
+        batch_kernel = torch.nn.functional.embedding(fake_samples.ids, kernel)  # shape (N, T, V)
+        likelihood = torch.tensordot(fake_samples.probs, kernel, dims=1)
 
-        normalized_advantage = batch_kernel * advantage / (likelihood + tf.keras.backend.epsilon())
-        full_loss = -tf.stop_gradient(normalized_advantage) * fake_samples.probs
+        normalized_advantage = batch_kernel * advantage / (likelihood + 1e-8)
+        full_loss = -normalized_advantage.detach() * fake_samples.probs
         policy_loss = masked_reduce(full_loss, mask=fake_samples.mask)
-        return LossCollection(policy_loss, adv=tf.reduce_mean(adv_loss))
+        return LossCollection(policy_loss, adv=adv_loss.mean())
 
     @staticmethod
     def taylor_first_order(y, x0, xs):
-        dy, = tf.gradients(y, x0)  # (N, T, E)
+        """
+        Args:
+            y: any shape computed by x0
+            x0: shape (*M, d)
+            xs: shape (N, d)
+
+        Returns:
+            dy: shape (*M, N)
+        """
+        dydx0, = torch.autograd.grad(y, x0, grad_outputs=torch.ones_like(y))  # (*M, d)
+        # dydx0 * (xs - x0) = dydx0 * xs - dydx0 * x0
         return (
-            tf.tensordot(dy, xs, axes=[-1, -1])  # (N, T, V)
-            - tf.reduce_sum(dy * x0, axis=-1, keepdims=True)  # (N, T, 1)
+            torch.tensordot(dydx0, xs, dims=[[-1], [-1]])  # (*M, N)
+            - (dydx0 * x0).sum(dim=-1, keepdim=True)  # (*M, 1)
         )
+
+    def compute_advantage(self, reward):
+        if self.baseline is None:
+            self.baseline = reward.mean()
+
+        advantage = reward - self.baseline
+        self.baseline = (
+            self.baseline * self.baseline_decay + reward.mean() * (1 - self.baseline_decay)
+        )
+        return advantage
 
 
 class StraightThroughEstimator(GANEstimator):
@@ -89,9 +116,9 @@ class StraightThroughEstimator(GANEstimator):
         score = discriminator.score_word_vector(word_vecs)
         adv_loss = generator_loss(score)
 
-        d_word_vecs, = tf.gradients(adv_loss, word_vecs)  # (N, T, E)
+        d_word_vecs, = torch.autograd.grad(adv_loss, word_vecs)  # (N, T, E)
         # NOTE, can be derived by chain-rule
-        d_onehot = tf.tensordot(d_word_vecs, discriminator.embedding_matrix, axes=[-1, -1])
-        full_loss = tf.stop_gradient(d_onehot) * fake_samples.probs  # (N, T, V)
+        d_onehot = torch.tensordot(d_word_vecs, discriminator.embedding_matrix, dims=[[-1], [-1]])
+        full_loss = d_onehot.detach() * fake_samples.probs  # (N, T, V)
         policy_loss = masked_reduce(full_loss, mask=fake_samples.mask)
-        return LossCollection(policy_loss, adv=tf.reduce_mean(adv_loss))
+        return LossCollection(policy_loss, adv=adv_loss.mean())

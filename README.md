@@ -61,17 +61,18 @@ $ python src/scripts/train/GAN.py
 - Usage
 
 ```bash
-usage: GAN.py [-h] --dataset {coco_cleaned, news_cleaned, test} [--maxlen positive-int] [--vocab_size positive-int]
-              [-g {gru, test}(*args, **kwargs)] [--tie-embeddings] [--g-fix-embeddings]
+usage: GAN.py [-h] --dataset {coco_cleaned, news_cleaned, test} [--maxlen positive-int]
+              [--vocab-size positive-int] [-g {gru, test}(*args, **kwargs)] [--tie-embeddings] [--g-fix-embeddings]
               [-d {cnn, resnet, test}(*args, **kwargs)] [--d-fix-embeddings]
               [--loss {alt, JS, KL, RKL}]
-              [--estimator {reinforce, st, taylor, gumbel}(*args, **kwargs)] [--d-steps positive-int]
-              [--g-regularizers REGULARIZER(*args, **kwargs) [REGULARIZER(*args, **kwargs) ...]]
+              [--estimator {reinforce, st, taylor, gumbel}(*args, **kwargs)]
+              [--d-steps positive-int] [--g-regularizers REGULARIZER(*args, **kwargs) [REGULARIZER(*args, **kwargs) ...]]
               [--d-regularizers REGULARIZER(*args, **kwargs) [REGULARIZER(*args, **kwargs) ...]]
-              [--g-optimizer {sgd, rmsprop, adam, radam}(*args, **kwargs)]
-              [--d-optimizer {sgd, rmsprop, adam, radam}(*args, **kwargs)] [--epochs positive-int]
+              [--g-optimizer {sgd, rmsprop, adam}(*args, **kwargs)]
+              [--d-optimizer {sgd, rmsprop, adam}(*args, **kwargs)] [--epochs positive-int]
               [--batch-size positive-int] [--random-seed int] [--bleu [int∈[1, 5]]] [--fed [positive-int]] [--checkpoint-root Path]
-              [--serving-root Path] [--save-period positive-int] [--tensorboard [Path]] [--tags TAG [TAG ...]] [--jit] [--debug] [--profile [Path]]
+              [--serving-root Path] [--save-period positive-int] [--tensorboard [Path]] [--tags TAG [TAG ...]] [--profile [Path]]
+
 ```
 
 See more details and custom options for models/optimizers/regularizers:
@@ -83,7 +84,7 @@ python src/scripts/train/GAN.py -h
 - NeurIPS 2020 Parameters
 
 ```bash
-python src/scripts/train/GAN.py \
+$ python src/scripts/train/GAN.py \
          --dataset news_cleaned \
          -g gru --tie-embeddings --g-reg 'entropy(0.02)' \
          -d 'cnn(activation="elu")' --d-reg 'spectral(0.07)' 'embedding(0.2, max_norm=1)' \

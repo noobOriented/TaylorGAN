@@ -64,22 +64,12 @@ def load_parser(**kwargs):
         required=True,
         help='path of serving model folder.',
     )
-    group.add_argument(
-        '--version-number',
-        default='0',
-        help='number of model version.',
-    )
     return parser
 
 
 def develop_parser():
     parser = ArgumentParser(add_help=False)
     group = parser.add_argument_group('develop', description='Developers only options.')
-    group.add_argument(
-        '--debug',
-        action='store_true',
-        help='whether to print tensorflow warning message.',
-    )
     group.add_argument(
         '--profile',
         nargs='?',
@@ -130,19 +120,5 @@ def logging_parser():
         metavar='TAG',
         default=[],
         help="additional tags to configure this training (will be used in tensorboard).",
-    )
-    return parser
-
-
-def backend_parser():
-    parser = ArgumentParser(add_help=False)
-    group = parser.add_argument_group(
-        'backend',
-        description="settings of backend graph & session.",
-    )
-    group.add_argument(
-        '--jit',
-        action='store_true',
-        help='whether to set global_jit_level = ON_1',
     )
     return parser

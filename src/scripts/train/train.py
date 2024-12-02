@@ -2,21 +2,14 @@ import warnings
 
 warnings.simplefilter('ignore', category=FutureWarning)
 
-import tensorflow as tf
-
 from library.utils import logging_indent
 from core.train import DataLoader
+from core.train.callbacks import ModelCheckpoint
 from factories import callback_factory, data_factory, generator_factory, trainer_factory
-from scripts.snippets import (
-    get_tf_config_proto,
-    set_global_random_seed,
-    set_package_verbosity,
-)
+from scripts.snippets import set_global_random_seed
 
 
 def main(args, base_tag=None, checkpoint=None):
-    set_package_verbosity(args.debug)
-
     with logging_indent("Set global random seed"):
         set_global_random_seed(args.random_seed)
 
@@ -47,15 +40,12 @@ def main(args, base_tag=None, checkpoint=None):
             base_tag=base_tag,
         )
 
-    with tf.Session(config=get_tf_config_proto(args.jit)) as sess:
-        if checkpoint:
-            print(f"Restore from checkpoint: {checkpoint}")
-            tf.train.Saver().restore(sess, save_path=checkpoint)
-            data_loader.skip_epochs(int(checkpoint.split('-')[-1]))
-        else:
-            tf.global_variables_initializer().run()
+    if checkpoint:
+        print(f"Restore from checkpoint: {checkpoint}")
+        trainer.load_state(path=checkpoint)
+        data_loader.skip_epochs(ModelCheckpoint.epoch_number(checkpoint))
 
-        trainer.fit(data_loader)
+    trainer.fit(data_loader)
 
 
 def parse_args(argv, algorithm):
@@ -66,7 +56,6 @@ def parse_args(argv, algorithm):
         evaluate_parser,
         save_parser,
         logging_parser,
-        backend_parser,
         develop_parser,
     )
 
@@ -81,7 +70,6 @@ def parse_args(argv, algorithm):
             evaluate_parser(),
             save_parser(),
             logging_parser(),
-            backend_parser(),
             develop_parser(),
         ],
     )

@@ -1,23 +1,21 @@
 from typing import List
 
-from flexparse import ArgumentParser, create_action, Action, LookUpCall
+from flexparse import ArgumentParser, create_action, Action
 
 
 def create_factory_action(
         *args,
-        registry: dict,
+        type: callable,  # noqa
         help_prefix: str = '',
         default=None,
-        set_info: bool = False,
         **kwargs,
     ) -> Action:
-    factory = LookUpCall(registry, set_info=set_info)
     return create_action(
         *args,
-        type=factory,
+        type=type,
         default=default,
         help=(
-            help_prefix + "custom options and registry: \n" + "\n".join(factory.get_helps()) + "\n"
+            help_prefix + "custom options and registry: \n" + "\n".join(type.get_helps()) + "\n"
         ),
         **kwargs,
     )

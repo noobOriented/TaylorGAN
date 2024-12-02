@@ -1,36 +1,48 @@
 import abc
+import torch
 
-import tensorflow as tf
-
-from core.models.sequence_modeling import TokenSequence
+from core.models import Generator
 from core.train import GeneratorUpdater, Trainer
+from core.train.optimizer import OptimizerWrapper
 from factories.modules import generator_factory
-from flexparse import ArgumentParser
+from flexparse import ArgumentParser, LookUpCall
+from library.utils import ArgumentBinder
 
-from . import optimizers
+from ..utils import create_factory_action
 
 
-def create(args, meta_data, generator) -> Trainer:
+def create(args, meta_data, generator: Generator) -> Trainer:
     creator = args.creator_cls(args, meta_data, generator)
-
-    placeholder = tf.placeholder(tf.int32, shape=[args.batch_size, meta_data.maxlen])
-    real_samples = TokenSequence(
-        ids=placeholder,
-        eos_idx=meta_data.special_token_config.eos.idx,
-    )
-
     generator_updater = GeneratorUpdater(
         generator,
-        optimizer=args[G_OPTIMIZER_ARG],
+        optimizer=args[G_OPTIMIZER_ARG](generator.trainable_variables),
         losses=[creator.objective] + args[generator_factory.REGULARIZER_ARG],
     )
-    trainer = creator.create_trainer(placeholder, generator_updater)
-    # NOTE for static graph
-    trainer.build_graph(real_samples)
-    return trainer
+    return creator.create_trainer(generator_updater)
 
 
-G_OPTIMIZER_ARG = optimizers.create_action_of('generator')
+def create_optimizer_action_of(module_name: str):
+    return create_factory_action(
+        f'--{module_name[0]}-optimizer',
+        type=LookUpCall(
+            {
+                key: ArgumentBinder(
+                    OptimizerWrapper.as_constructor(optim_cls),
+                    preserved=['params'],
+                )
+                for key, optim_cls in [
+                    ('sgd', torch.optim.SGD),
+                    ('rmsprop', torch.optim.RMSprop),
+                    ('adam', torch.optim.Adam),
+                ]
+            },
+        ),
+        default='adam(lr=1e-4, betas=(0.5, 0.999), clip_norm=10)',
+        help_prefix=f"{module_name}'s optimizer.\n",
+    )
+
+
+G_OPTIMIZER_ARG = create_optimizer_action_of('generator')
 
 
 def create_parser(algorithm):
@@ -72,7 +84,7 @@ class TrainerCreator(abc.ABC):
         self.generator = generator
 
     @abc.abstractmethod
-    def create_trainer(self, placeholder, generator_updater) -> Trainer:
+    def create_trainer(self, generator_updater) -> Trainer:
         pass
 
     @property
