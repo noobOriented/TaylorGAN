@@ -1,7 +1,6 @@
 import abc
 import pathlib
 import typing as t
-from more_itertools import with_iter
 
 from core.cache import cache_center
 from library.utils import format_path, logging_indent, tqdm_open
@@ -51,7 +50,8 @@ class UttutPreprocessor(Preprocessor):
                 @cache_center.to_npz(self.get_cache_dir(corpus_config) / f'{key}_data.npz')
                 def _process_text_file(filepath):
                     print(f"Load corpus data from {format_path(filepath)}")
-                    return tokenizer.texts_to_array(with_iter(tqdm_open(filepath)))
+                    with tqdm_open(filepath) as f:
+                        return tokenizer.texts_to_array(f)
 
                 with logging_indent(f"{key} data:", bullet=False):
                     ids = _process_text_file(path)

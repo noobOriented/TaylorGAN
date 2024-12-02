@@ -48,6 +48,7 @@ class Tokenizer(abc.ABC, JSONSerializableMixin):
         tokens = self.language_config.segmentize_text(text)
         tokens.append(self.special_token_config.eos.token)
         tokens = more_itertools.padded(tokens, self.special_token_config.pad.token)
+        tokens = more_itertools.take(self.maxlen, tokens)
         return [
             self._token2index.get(s, self.special_token_config.unk.idx)
             for s in tokens
