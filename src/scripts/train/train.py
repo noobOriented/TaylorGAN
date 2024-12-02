@@ -1,6 +1,7 @@
 from core.train import DataLoader
 from core.train.callbacks import ModelCheckpoint
 from factories import callback_factory, data_factory, generator_factory, trainer_factory
+from factories.trainer_factory.trainer_factory import TrainerCreator
 from library.utils import logging_indent
 from scripts.snippets import set_global_random_seed
 
@@ -47,7 +48,7 @@ def main(args, base_tag=None, checkpoint=None):
     trainer.fit(data_loader)
 
 
-def parse_args(argv, algorithm):
+def parse_args(argv, algorithm: type[TrainerCreator]):
     from flexparse import ArgumentParser
     from flexparse.formatters import RawTextHelpFormatter
 

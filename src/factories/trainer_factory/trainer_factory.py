@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import abc
+import typing as t
 
 import torch
-from flexparse import ArgumentParser, LookUpCall
+from flexparse import Action, ArgumentParser, LookUpCall
 
 from core.models import Generator
 from core.train import GeneratorUpdater, Trainer
@@ -46,7 +49,7 @@ def create_optimizer_action_of(module_name: str):
 G_OPTIMIZER_ARG = create_optimizer_action_of('generator')
 
 
-def create_parser(algorithm):
+def create_parser(algorithm: type[TrainerCreator]):
     parser = ArgumentParser(add_help=False)
     parser.add_argument_group(
         'model',
@@ -86,29 +89,29 @@ class TrainerCreator(abc.ABC):
 
     @abc.abstractmethod
     def create_trainer(self, generator_updater) -> Trainer:
-        pass
+        ...
 
     @property
     @abc.abstractmethod
-    def objective(self):
-        pass
+    def objective(self) -> t.Callable:
+        ...
 
     @classmethod
     @abc.abstractmethod
-    def model_args(cls):
-        pass
+    def model_args(cls) -> list[Action]:
+        ...
 
     @classmethod
     @abc.abstractmethod
-    def objective_args(cls):
-        pass
+    def objective_args(cls) -> list[Action]:
+        ...
 
     @classmethod
     @abc.abstractmethod
-    def regularizer_args(cls):
-        pass
+    def regularizer_args(cls) -> list[Action]:
+        ...
 
     @classmethod
     @abc.abstractmethod
-    def optimizer_args(cls):
-        pass
+    def optimizer_args(cls) -> list[Action]:
+        ...
