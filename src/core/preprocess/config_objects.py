@@ -52,7 +52,7 @@ class CorpusConfig:
         maxlen: int | None = None,  # used when preprocessor.maxlen = None
         vocab_size: int | None = None,  # used when preprocessor.vocab_size = None
     ):
-        if isinstance(path, str):
+        if not isinstance(path, t.Mapping):
             path = {'train': path}
         self.path = path
         self.language_config = language_config
@@ -63,9 +63,6 @@ class CorpusConfig:
         with tqdm_open(self.path['train']) as it:
             for s in it:
                 yield self.language_config.segmentize_text(s)
-
-    def is_valid(self) -> bool:
-        return 'train' in self.path and all(os.path.isfile(p) for p in self.path.values())
 
 
 class SpecialTokenConfig:

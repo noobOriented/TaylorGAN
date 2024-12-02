@@ -36,7 +36,7 @@ class UttutPreprocessor(Preprocessor):
         with logging_indent("Prepare text tokenizer..."):
             @cache_center.to_json(self.get_cache_dir(corpus_config) / 'tokenizer.json')
             def create_tokenizer():
-                print(f'Build text mapper based on corpus data from {format_path(corpus_config.path.train)}')
+                print(f'Build text mapper based on corpus data from {format_path(corpus_config.path["train"])}')
                 return Tokenizer.fit_corpus(
                     corpus_config,
                     maxlen=self.maxlen,

@@ -10,7 +10,7 @@ class TestTokenizer:
         return Tokenizer.fit_corpus(corpus_config)
 
     def test_mapping_consistent(self, tokenizer, corpus_config):
-        with open(corpus_config.path.train, 'r') as f:
+        with open(corpus_config.path['train'], 'r') as f:
             line = f.readline()
             ids1 = tokenizer.text_to_ids(line)
             text1 = tokenizer.ids_to_text(ids1)

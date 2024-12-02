@@ -38,7 +38,8 @@ def load_corpus_table(path):
     with open(path) as f:
         for data_id, corpus_dict in yaml.load(f, Loader=yaml.FullLoader).items():
             config = parse_config(corpus_dict)
-            if config.is_valid():  # TODO else warning?
+            if 'train' in config.path and all(os.path.isfile(p) for p in config.path.values()):
+                # TODO else warning?
                 corpus_table[data_id] = config
 
     return corpus_table
