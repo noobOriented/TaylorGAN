@@ -1,11 +1,11 @@
 import os
-import warnings
+import typing as t
 
-warnings.simplefilter('ignore', category=FutureWarning)
-
-from core.evaluate import BLEUCalculator, SmoothingFunction, FEDCalculator
+from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
+from core.preprocess.record_objects import TextDataset
 from factories import data_factory
 from library.utils import random_sample
+
 
 # HUB_URL = "https://tfhub.dev/google/universal-sentence-encoder-large/3"
 HUB_URL = "https://tfhub.dev/google/universal-sentence-encoder/2"
@@ -13,7 +13,7 @@ RLM_EPOCHS = 100
 
 
 def main(args):
-    data_collection, meta_data = data_factory.preprocess(args, return_meta=True)
+    data_collection, meta_data = data_factory.preprocess(args)
     tokenizer = meta_data.tokenizer
 
     metric_calcuators = []
@@ -46,7 +46,7 @@ def main(args):
 
 class BLEUMetrics:
 
-    def __init__(self, data_collection, cache_dir, eos_idx=1, max_gram=5):
+    def __init__(self, data_collection: t.Mapping[str, TextDataset], cache_dir, eos_idx=1, max_gram=5):
         self.calculators = {
             tag: BLEUCalculator(
                 dataset.ids,
@@ -96,7 +96,8 @@ class FEDMetrics:
 
 def parse_args(argv):
     from flexparse import ArgumentParser
-    from scripts.parsers import evaluate_parser, develop_parser
+
+    from scripts.parsers import develop_parser, evaluate_parser
 
     parser = ArgumentParser(parents=[
         data_factory.PARSER,

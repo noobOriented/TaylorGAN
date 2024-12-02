@@ -1,4 +1,4 @@
-from torch.nn import ReLU, ELU, LeakyReLU
+from torch.nn import ELU, LeakyReLU, ReLU
 
 from ..activations import deserialize
 

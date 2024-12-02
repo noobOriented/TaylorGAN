@@ -2,8 +2,8 @@ import os
 import pathlib
 
 from dotenv import load_dotenv
-
 from flexparse import ArgumentParser, IntRange
+
 from library.utils import format_path
 
 

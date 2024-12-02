@@ -2,7 +2,7 @@ from itertools import chain
 
 import torch
 
-from library.utils import format_object, ObjectWrapper, wraps_with_new_signature
+from library.utils import ObjectWrapper, format_object, wraps_with_new_signature
 
 
 class OptimizerWrapper(ObjectWrapper):

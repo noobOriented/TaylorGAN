@@ -1,12 +1,16 @@
 import pytest
 
-from ..tokenizers import Tokenizer, UttutTokenizer
+from ..tokenizers import Tokenizer
 
 
-class TokenizerTestTemplate:
+class TestTokenizer:
+
+    @pytest.fixture(scope='class')
+    def tokenizer(self, corpus_config):
+        return Tokenizer.fit_corpus(corpus_config)
 
     def test_mapping_consistent(self, tokenizer, corpus_config):
-        with open(corpus_config.path.train, 'r') as f:
+        with open(corpus_config.path['train'], 'r') as f:
             line = f.readline()
             ids1 = tokenizer.text_to_ids(line)
             text1 = tokenizer.ids_to_text(ids1)
@@ -19,15 +23,7 @@ class TokenizerTestTemplate:
     def test_save_load(self, tokenizer, tmpdir):
         path = tmpdir / 'tokenizer.json'
         tokenizer.save(path)
-        self.assert_equal(tokenizer, Tokenizer.load(path))
+        loaded = Tokenizer.load(path)
 
-
-class TestUttutTokenizer(TokenizerTestTemplate):
-
-    @pytest.fixture(scope='class')
-    def tokenizer(self, corpus_config):
-        return UttutTokenizer.fit_corpus(corpus_config)
-
-    def assert_equal(self, a, b):
-        assert a.tokens == b.tokens
-        assert a.maxlen == b.maxlen
+        assert tokenizer.tokens == loaded.tokens
+        assert tokenizer.maxlen == loaded.maxlen

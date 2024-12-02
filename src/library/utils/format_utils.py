@@ -1,11 +1,11 @@
-import termcolor
 from itertools import chain
-from typing import List
+
+import termcolor
 
 from .func_utils import ObjectWrapper
 
 
-def left_aligned(str_list: List[str]) -> List[str]:
+def left_aligned(str_list: list[str]) -> list[str]:
     maxlen = max(map(len, str_list), default=0)
     return [f"{s:<{maxlen}}" for s in str_list]
 

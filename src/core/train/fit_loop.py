@@ -1,7 +1,8 @@
 from more_itertools import ilen
 
-from library.utils import batch_generator, format_highlight
 from core.preprocess import TextDataset
+from library.utils import batch_generator, format_highlight
+
 from .callbacks import NullCallback
 
 

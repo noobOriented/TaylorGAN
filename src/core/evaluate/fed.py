@@ -1,5 +1,4 @@
 from functools import lru_cache
-from typing import List
 
 import numpy as np
 
@@ -12,7 +11,7 @@ class FEDCalculator:
         self.fed_model = FEDModel.download_from(hub_url)
         self.encoded_references = self.fed_model.encode(references)
 
-    def calculate_fed_score(self, candidates: List[str]):
+    def calculate_fed_score(self, candidates: list[str]):
         encoded_candidates = self.fed_model.encode(candidates)
         return self.fed_model.compute_fed_score(
             self.encoded_references,
@@ -58,7 +57,7 @@ class FEDModel:
         self.sess = tf.Session(graph=self.graph, config=config)
         self.sess.run(init_op)
 
-    def encode(self, sentences: List[str], batch_size: int = 64):
+    def encode(self, sentences: list[str], batch_size: int = 64):
         encoded_sentences = [
             self.sess.run(
                 self.encoded_sentences,

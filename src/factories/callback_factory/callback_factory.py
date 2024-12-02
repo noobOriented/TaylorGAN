@@ -1,29 +1,34 @@
+import functools
 import time
 import warnings
+import typing as t
 from pathlib import Path
-from typing import List
 
 from core.evaluate import TextGenerator
+from core.models.generators import Generator
 from core.preprocess import MetaData
+from core.preprocess.record_objects import TextDataset
 from core.train.callbacks import (
-    CallbackList,
-    ModelCheckpoint,
-    ModelSaver,
-    ProgbarLogger,
-    TensorBoardXWritter,
-    TrainProfiler,
+    CallbackList, ModelCheckpoint, ModelSaver, ProgbarLogger, TensorBoardXWritter, TrainProfiler,
 )
-from library.utils import cached_property
+from core.train.trainers import Trainer
 
 from .evaluator_creator import EvaluatorCreator
 
 
-def create(args, trainer, generator, data_collection, meta_data, base_tag):
+def create(
+    args,
+    trainer: Trainer,
+    generator: Generator,
+    data_collection: t.Mapping[str, TextDataset],
+    metadata: MetaData,
+    base_tag: str | None,
+):
     base_tag = base_tag or f"{args.dataset}@{time.strftime('%Y%m%d-%H%M%S')}"
-    creator = CallbackCreator(
+    creator = _CallbackCreator(
         generator=generator,
         data_collection=data_collection,
-        meta_data=meta_data,
+        metadata=metadata,
         tags=args.tags + [base_tag],
     )
 
@@ -49,25 +54,25 @@ def create(args, trainer, generator, data_collection, meta_data, base_tag):
     return callback_list
 
 
-class CallbackCreator:
+class _CallbackCreator:
 
-    def __init__(self, generator, data_collection, meta_data: MetaData, tags: List[str]):
+    def __init__(self, generator, data_collection: t.Mapping[str, TextDataset], metadata: MetaData, tags: list[str]):
         self.generator = generator
         self.data_collection = data_collection
-        self.meta_data = meta_data
+        self.metadata = metadata
         self.tag = Path(*tags)
 
     def create_evaluator(self, bleu_n_gram: int, sample_size: int, fed_sample_size: int):
         return EvaluatorCreator(
             text_generator=self.text_generator,
             data_collection=self.data_collection,
-            meta_data=self.meta_data,
+            metadata=self.metadata,
         ).create(bleu_n_gram, sample_size, fed_sample_size)
 
     def create_loggers(self, updaters, tensorboard_logdir: Path):
         yield ProgbarLogger(
             desc=self.tag,
-            total=len(self.data_collection.train),
+            total=len(self.data_collection['train']),
             updaters=updaters,
         )
         if tensorboard_logdir:
@@ -81,7 +86,7 @@ class CallbackCreator:
         if serving_root:
             serving_dir = serving_root / self.tag
             serving_dir.mkdir(exist_ok=True)
-            self.meta_data.tokenizer.save(serving_dir / 'tokenizer.json')
+            self.metadata.tokenizer.save(serving_dir / 'tokenizer.json')
             yield ModelSaver(
                 module=self.text_generator,
                 directory=serving_dir,
@@ -106,6 +111,6 @@ class CallbackCreator:
                 stop_training_when_finish=True,
             )
 
-    @cached_property
+    @functools.cached_property
     def text_generator(self):
-        return TextGenerator(self.generator, tokenizer=self.meta_data.tokenizer)
+        return TextGenerator(self.generator, tokenizer=self.metadata.tokenizer)

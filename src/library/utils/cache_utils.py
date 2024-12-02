@@ -2,38 +2,12 @@ import json
 import os
 import pickle
 from contextlib import contextmanager
-from functools import wraps, lru_cache
-from typing import List
-from weakref import WeakKeyDictionary
+from functools import lru_cache, wraps
 
 import numpy as np
 
 from .format_utils import format_path
 from .func_utils import ObjectWrapper
-
-
-class cached_property:
-
-    NOT_FOUND = object()
-
-    def __init__(self, func):
-        self.__doc__ = func.__doc__
-        self.func = func
-        self._instance_to_value = WeakKeyDictionary()
-
-    def __get__(self, instance, instance_cls):
-        if instance is None:  # just get the cached_property object
-            return self
-
-        value = self._instance_to_value.get(instance, self.NOT_FOUND)
-        if value is self.NOT_FOUND:
-            value = self.func(instance)
-            self._instance_to_value[instance] = value
-
-        return value
-
-    def __set__(self, instance, value):
-        raise AttributeError("can't set attribute")
 
 
 class FileCache:
@@ -160,7 +134,7 @@ class JSONCache(FileCache):
 
 
 @contextmanager
-def reuse_method_call(obj, methods: List[str]):
+def reuse_method_call(obj, methods: list[str]):
     wrapped_obj = ObjectWrapper(obj)
     for method_name in methods:
         old_method = getattr(obj, method_name)

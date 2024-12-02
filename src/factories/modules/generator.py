@@ -1,26 +1,24 @@
 from functools import partial
 
 import torch
+from flexparse import LookUpCall, Namespace, create_action
 from torch.nn import Embedding, GRUCell, Linear, Sequential
 
-from core.models import Generator, AutoRegressiveGenerator
+from core.models import AutoRegressiveGenerator, Generator
 from core.objectives.regularizers import (
-    LossScaler,
-    SpectralRegularizer,
-    EmbeddingRegularizer,
-    EntropyRegularizer,
+    EmbeddingRegularizer, EntropyRegularizer, LossScaler, SpectralRegularizer,
 )
-from flexparse import create_action, Namespace, LookUpCall
+from core.preprocess.record_objects import MetaData
 from library.utils import NamedObject
 
 from ..utils import create_factory_action
 
 
-def create(args: Namespace, meta_data) -> Generator:
+def create(args: Namespace, metadata: MetaData) -> Generator:
     cell_func, fix_embeddings, tie_embeddings = args[MODEL_ARGS]
     print(f"Create generator: {cell_func.argument_info.arg_string}")
 
-    embedding_matrix = torch.from_numpy(meta_data.load_pretrained_embeddings())
+    embedding_matrix = torch.from_numpy(metadata.load_pretrained_embeddings())
     embedder = Embedding.from_pretrained(embedding_matrix, freeze=fix_embeddings)
     presoftmax_layer = Linear(embedder.embedding_dim, embedder.num_embeddings)
     if tie_embeddings:
@@ -37,7 +35,7 @@ def create(args: Namespace, meta_data) -> Generator:
                 Linear(cell.hidden_size, embedder.embedding_dim, bias=False),
                 presoftmax_layer,
             ),
-            special_token_config=meta_data.special_token_config,
+            special_token_config=metadata.special_token_config,
         ),
         name=cell_func.argument_info.func_name,
     )

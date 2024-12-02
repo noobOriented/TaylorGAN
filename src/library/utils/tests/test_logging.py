@@ -1,7 +1,7 @@
 import sys
 from unittest.mock import patch
 
-from ..logging import logging_indent, TqdmRedirector, PRINT, _IndentPrinter
+from ..logging import PRINT, TqdmRedirector, _IndentPrinter, logging_indent
 
 
 class TestLoggingIndent:

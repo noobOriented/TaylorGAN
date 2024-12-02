@@ -1,13 +1,9 @@
-import warnings
-
-warnings.simplefilter('ignore', category=FutureWarning)
-
 from core.evaluate import TextGenerator
 from factories import data_factory
 
 
 def main(args):
-    data_collection, meta = data_factory.preprocess(args, return_meta=True)
+    data_collection, meta = data_factory.preprocess(args)
     generator = TextGenerator.load_traced(args.model_path, tokenizer=meta.tokenizer)
     for tag, dataset in data_collection.items():
         print(f"Evaluate {tag} perplexity:")
@@ -17,6 +13,7 @@ def main(args):
 
 def parse_args(argv):
     from flexparse import ArgumentParser
+
     from scripts.parsers import develop_parser, load_parser
 
     return ArgumentParser(

@@ -1,22 +1,13 @@
 import os
-import yaml
 
+import yaml
 from dotenv import load_dotenv
-from flexparse import (
-    SUPPRESS, create_action, IntRange, LookUp, Namespace,
-    ArgumentParser,
-)
-from uttut.pipeline.ops import (
-    EngTokenizer,
-    MergeWhiteSpaceCharacters,
-    StripWhiteSpaceCharacters,
-    Lowercase,
-)
+from flexparse import SUPPRESS, ArgumentParser, IntRange, LookUp, Namespace, create_action
 
 from core.preprocess import UttutPreprocessor
-from core.preprocess.adaptors import UttutPipeline
-from core.preprocess.config_objects import CorpusConfig, LanguageConfig, Namespace as PathNamespace
-from library.utils import format_id, format_path, NamedDict
+from core.preprocess.config_objects import CorpusConfig, LanguageConfig
+from core.preprocess.record_objects import MetaData, TextDataset
+from library.utils import NamedDict, format_id, format_path
 
 
 load_dotenv('.env')
@@ -25,12 +16,6 @@ CONFIG_PATH = 'datasets/corpus.yaml'
 LANGUAGE_CONFIGS = {
     'english': LanguageConfig(
         embedding_path=os.getenv('PRETRAINED_EN_WORD_FASTTEXT_PATH'),
-        segmentor=UttutPipeline([
-            MergeWhiteSpaceCharacters(),
-            StripWhiteSpaceCharacters(),
-            Lowercase(),
-            EngTokenizer(),
-        ]),
         split_token=' ',
     ),
     'test': LanguageConfig(
@@ -40,12 +25,12 @@ LANGUAGE_CONFIGS = {
 }
 
 
-def preprocess(args: Namespace, return_meta: bool = False):
+def preprocess(args: Namespace) -> tuple[dict[str, TextDataset], MetaData]:
     dataset, maxlen, vocab_size = args[ARGS]
     print(f"data_id: {format_id(dataset)}")
     print(f"preprocessor_id {format_id('uttut')}")
     preprocessor = UttutPreprocessor(maxlen=maxlen, vocab_size=vocab_size)
-    return preprocessor.preprocess(dataset, return_meta=return_meta)
+    return preprocessor.preprocess(dataset, return_meta=True)
 
 
 def load_corpus_table(path):
@@ -53,7 +38,8 @@ def load_corpus_table(path):
     with open(path) as f:
         for data_id, corpus_dict in yaml.load(f, Loader=yaml.FullLoader).items():
             config = parse_config(corpus_dict)
-            if config.is_valid():  # TODO else warning?
+            if 'train' in config.path and all(os.path.isfile(p) for p in config.path.values()):
+                # TODO else warning?
                 corpus_table[data_id] = config
 
     return corpus_table
@@ -61,9 +47,9 @@ def load_corpus_table(path):
 
 def parse_config(corpus_dict):
     if isinstance(corpus_dict['path'], dict):
-        path = PathNamespace(**corpus_dict['path'])
+        path = corpus_dict['path']
     else:
-        path = PathNamespace(train=corpus_dict['path'])
+        path = {'train': corpus_dict['path']}
 
     language_id = corpus_dict['language']
     return CorpusConfig(

@@ -1,11 +1,7 @@
-import warnings
-
-warnings.simplefilter('ignore', category=FutureWarning)
-
-from library.utils import logging_indent
 from core.train import DataLoader
 from core.train.callbacks import ModelCheckpoint
 from factories import callback_factory, data_factory, generator_factory, trainer_factory
+from library.utils import logging_indent
 from scripts.snippets import set_global_random_seed
 
 
@@ -14,20 +10,23 @@ def main(args, base_tag=None, checkpoint=None):
         set_global_random_seed(args.random_seed)
 
     with logging_indent("Preprocess data"):
-        data_collection, meta_data = data_factory.preprocess(args, return_meta=True)
-        data_collection.summary()
-        meta_data.summary()
+        data_collection, metadata = data_factory.preprocess(args)
+        with logging_indent("Data summary:"):
+            for key, array in data_collection.items():
+                print(f"{key} data contains {len(array)} sentences.")
+
+        metadata.tokenizer.summary()
 
     with logging_indent("Prepare Generator"):
-        generator = generator_factory.create(args, meta_data)
+        generator = generator_factory.create(args, metadata)
 
     with logging_indent("Prepare Generator Trainer"):
-        trainer = trainer_factory.create(args, meta_data, generator)
+        trainer = trainer_factory.create(args, metadata, generator)
         trainer.summary()
 
     with logging_indent("Prepare Callback"):
         data_loader = DataLoader(
-            data_collection.train,
+            data_collection['train'],
             batch_size=args.batch_size,
             n_epochs=args.epochs,
         )
@@ -36,7 +35,7 @@ def main(args, base_tag=None, checkpoint=None):
             trainer=trainer,
             generator=generator,
             data_collection=data_collection,
-            meta_data=meta_data,
+            metadata=metadata,
             base_tag=base_tag,
         )
 
@@ -51,12 +50,9 @@ def main(args, base_tag=None, checkpoint=None):
 def parse_args(argv, algorithm):
     from flexparse import ArgumentParser
     from flexparse.formatters import RawTextHelpFormatter
+
     from scripts.parsers import (
-        train_parser,
-        evaluate_parser,
-        save_parser,
-        logging_parser,
-        develop_parser,
+        develop_parser, evaluate_parser, logging_parser, save_parser, train_parser,
     )
 
     parser = ArgumentParser(

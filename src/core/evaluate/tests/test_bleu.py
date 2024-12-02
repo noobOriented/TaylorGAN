@@ -1,11 +1,6 @@
 import numpy as np
 
-from ..bleu import (
-    get_closest_values,
-    hashable_ngrams,
-    BLEUCalculator,
-    SmoothingFunction,
-)
+from ..bleu import BLEUCalculator, SmoothingFunction, get_closest_values, hashable_ngrams
 
 
 EOS = -1

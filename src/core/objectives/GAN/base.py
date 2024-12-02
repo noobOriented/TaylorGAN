@@ -1,6 +1,5 @@
 import abc
-
-from typing import Callable
+import typing as t
 
 import torch
 
@@ -37,10 +36,10 @@ class GANEstimator(abc.ABC, FormatableMixin):
 class GANLossTuple:
 
     def __init__(
-            self,
-            generator_loss: Callable[[torch.Tensor], torch.Tensor],
-            discriminator_loss: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = None,
-        ):
+        self,
+        generator_loss: t.Callable[[torch.Tensor], torch.Tensor],
+        discriminator_loss: t.Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = None,
+    ):
         self.generator_loss = generator_loss
         self._discriminator_loss = discriminator_loss or D_BCE
 

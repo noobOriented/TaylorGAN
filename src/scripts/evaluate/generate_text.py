@@ -1,7 +1,4 @@
 import pathlib
-import warnings
-
-warnings.simplefilter('ignore', category=FutureWarning)
 
 from core.evaluate import TextGenerator
 from core.preprocess import Tokenizer
@@ -20,6 +17,7 @@ def main(args):
 
 def parse_args(argv):
     from flexparse import ArgumentParser, IntRange
+
     from scripts.parsers import develop_parser, load_parser
 
     parser = ArgumentParser(parents=[develop_parser(), load_parser()])

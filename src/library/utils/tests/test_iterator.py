@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from ..iterator import tqdm_open, batch_generator
+from ..iterator import batch_generator, tqdm_open
 
 
 def test_tqdm_open(tmpdir):

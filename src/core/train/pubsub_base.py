@@ -1,5 +1,4 @@
 import abc
-from typing import List
 
 
 class Subscriber(abc.ABC):
@@ -12,7 +11,7 @@ class Subscriber(abc.ABC):
 class Subject:
 
     def __init__(self):
-        self._subscribers: List[Subscriber] = []
+        self._subscribers: list[Subscriber] = []
 
     def attach_subscriber(self, subcriber: Subscriber):
         self._subscribers.append(subcriber)
