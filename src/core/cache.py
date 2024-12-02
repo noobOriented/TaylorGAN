@@ -1,9 +1,6 @@
 import functools
 import os
 import pathlib
-import warnings
-
-from dotenv import load_dotenv
 
 from library.utils import JSONCache, NumpyCache, PickleCache
 
@@ -14,7 +11,7 @@ class CacheCenter:
         self.root_path = root_path
 
     def to_file(self, *path, cacher):
-        if self.root_path is not None and all(path):
+        if self.root_path and all(path):
             return cacher.tofile(os.path.join(self.root_path, *path))
         return self._null_decorator
 
@@ -27,7 +24,6 @@ class CacheCenter:
         return func
 
 
-load_dotenv('.env')
-cache_root_dir = pathlib.Path(__file__).parent.parent / '.cache'
+cache_root_dir = pathlib.Path(__file__).parents[2] / '.cache'
 cache_root_dir.mkdir(exist_ok=True)
 cache_center = CacheCenter(cache_root_dir)

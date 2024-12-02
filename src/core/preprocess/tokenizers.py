@@ -61,6 +61,7 @@ class Tokenizer(abc.ABC, JSONSerializableMixin):
     @classmethod
     def fit_corpus(cls, corpus_config: CorpusConfig, maxlen: int | None = None, vocab_size: int | None = None):
         maxlen = maxlen or corpus_config.maxlen
+        vocab_size = vocab_size or corpus_config.vocab_size
         if maxlen:
             token_freq = collections.Counter(more_itertools.flatten(
                 more_itertools.take(maxlen, sen)
@@ -74,7 +75,7 @@ class Tokenizer(abc.ABC, JSONSerializableMixin):
             [token for token, _ in token_freq.most_common()],
         ))
         return cls(
-            tokens=more_itertools.take(n=vocab_size or corpus_config.vocab_size, iterable=all_tokens),
+            tokens=more_itertools.take(n=vocab_size, iterable=all_tokens),
             language_config=corpus_config.language_config,
             maxlen=maxlen,
         )

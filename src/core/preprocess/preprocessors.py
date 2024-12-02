@@ -1,4 +1,3 @@
-import abc
 import pathlib
 import typing as t
 
@@ -10,18 +9,7 @@ from .record_objects import MetaData, TextDataset
 from .tokenizers import Tokenizer
 
 
-class Preprocessor(abc.ABC):
-
-    @abc.abstractmethod
-    def preprocess(self, corpus_config: CorpusConfig) -> MetaData:
-        pass
-
-
-class UttutPreprocessor(Preprocessor):
-
-    def __init__(self, maxlen: int | None = None, vocab_size: int | None = None):
-        self.maxlen = maxlen
-        self.vocab_size = vocab_size
+class Preprocessor(t.Protocol):
 
     @t.overload
     def preprocess(self, corpus_config: CorpusConfig, return_meta: t.Literal[True]) -> tuple[dict[str, TextDataset], MetaData]:
@@ -30,6 +18,13 @@ class UttutPreprocessor(Preprocessor):
     @t.overload
     def preprocess(self, corpus_config: CorpusConfig, return_meta: bool = False) -> dict[str, TextDataset]:
         ...
+
+
+class UttutPreprocessor(Preprocessor):
+
+    def __init__(self, maxlen: int | None = None, vocab_size: int | None = None):
+        self.maxlen = maxlen
+        self.vocab_size = vocab_size
 
     def preprocess(self, corpus_config: CorpusConfig, return_meta: bool = False):
         with logging_indent("Prepare text tokenizer..."):
