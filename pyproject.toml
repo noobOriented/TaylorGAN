@@ -3,7 +3,9 @@ name = "taylorgan"
 version = "0.1.0"
 description = "Source code of our NeurIPS 2020 poster paper TaylorGAN: Neighbor-Augmented Policy Update Towards Sample-Efficient Natural Language Generation"
 authors = ["noobOriented <jsaon92@gmail.com>"]
-package-mode = false
+packages = [
+    { from = "src", include = "**/*.py" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.12"
