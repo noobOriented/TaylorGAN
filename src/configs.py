@@ -10,26 +10,6 @@ class _BaseModelExtraForbid(pydantic.BaseModel, extra='forbid'):
     pass
 
 
-class _CommonTrainingConfigs(_BaseModelExtraForbid):
-    data: DataConfigs
-    train: TrainConfigs
-    evaluate: EvaluateConfigs
-    save: SaveConfigs
-    logging: LoggingConfigs
-
-
-class MLETrainingConfigs(_CommonTrainingConfigs):
-    model: ModelConfigs
-    objective: ObjectiveConfigs
-    optimizer: OptimizerConfigs
-
-
-class GANTrainingConfigs(_CommonTrainingConfigs):
-    model: GANModelConfigs
-    objective: GANObjectiveConfigs
-    optimizer: GANOptimizerConfigs
-
-
 class DataConfigs(_BaseModelExtraForbid):
     dataset: str
     maxlen: pydantic.PositiveInt | None = None
@@ -37,35 +17,35 @@ class DataConfigs(_BaseModelExtraForbid):
 
 
 class ModelConfigs(_BaseModelExtraForbid):
-    generator: str  # TODO args
+    generator: str = 'gru'
     tie_embeddings: bool = False
-    fix_generator_embeddings: bool = False
+    g_fix_embeddings: bool = False
 
 
 class GANModelConfigs(ModelConfigs):
-    discriminator: str  # TODO args
-    fix_discriminator_embeddings: bool = False
+    discriminator: str = "cnn(activation='elu')"
+    d_fix_embeddings: bool = False
 
 
 class ObjectiveConfigs(_BaseModelExtraForbid):
-    generator_regularizers: list = []
+    g_regularizers: list = []
 
 
 class GANObjectiveConfigs(_BaseModelExtraForbid):
     loss: str = 'RKL'  # TODO args
     estimator: str = 'taylor'  # TODO args
-    discriminator_steps: pydantic.PositiveInt = 1
-    generator_regularizers: list = []
-    discriminator_regularizers: list = []
+    d_steps: pydantic.PositiveInt = 1
+    g_regularizers: list = []
+    d_regularizers: list = []
 
 
 class OptimizerConfigs(_BaseModelExtraForbid):
-    generator_optimizer: str
+    g_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
 
 
 class GANOptimizerConfigs(_BaseModelExtraForbid):
-    generator_optimizer: str
-    discriminator_optimizer: str
+    g_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
+    d_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
 
 
 class TrainConfigs(_BaseModelExtraForbid):
@@ -80,11 +60,23 @@ class EvaluateConfigs(_BaseModelExtraForbid):
 
 
 class SaveConfigs(_BaseModelExtraForbid):
-    checkpoint: pathlib.Path
-    serving: pathlib.Path
-    period: pydantic.PositiveInt = 1
+    checkpoint_root: pathlib.Path | None = None
+    serving_root: pathlib.Path | None = None
+    save_period: pydantic.PositiveInt = 1
 
 
 class LoggingConfigs(_BaseModelExtraForbid):
-    tensorboard: pathlib.Path
+    tensorboard: pathlib.Path | None = None
     tags: list[str] = []
+
+
+class _CommonTrainingConfigs(DataConfigs, TrainConfigs, EvaluateConfigs, SaveConfigs, LoggingConfigs):
+    profile: pathlib.Path | None = None
+
+
+class MLETrainingConfigs(_CommonTrainingConfigs, ModelConfigs, ObjectiveConfigs, OptimizerConfigs):
+    pass
+
+
+class GANTrainingConfigs(_CommonTrainingConfigs, GANModelConfigs, GANObjectiveConfigs, GANOptimizerConfigs):
+    pass
