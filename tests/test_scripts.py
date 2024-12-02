@@ -1,23 +1,23 @@
 import gc
-import os
+import pathlib
 import sys
 
 import pytest
 
 
 @pytest.fixture(scope='session')
-def cache_root_dir(tmpdir_factory):
-    return tmpdir_factory.mktemp('cache')
+def cache_root_dir(tmp_path_factory: pytest.TempPathFactory):
+    return tmp_path_factory.mktemp('cache')
 
 
 @pytest.fixture(scope='session')
-def serving_root(tmpdir_factory):
-    return tmpdir_factory.mktemp('tf_serving')
+def serving_root(tmp_path_factory: pytest.TempPathFactory):
+    return tmp_path_factory.mktemp('tf_serving')
 
 
 @pytest.fixture(scope='session')
-def checkpoint_root(tmpdir_factory):
-    return tmpdir_factory.mktemp('checkpoint')
+def checkpoint_root(tmp_path_factory: pytest.TempPathFactory):
+    return tmp_path_factory.mktemp('checkpoint')
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -64,22 +64,22 @@ class TestTrain:
 class TestSaveLoad:
 
     @pytest.mark.dependency(name='save_serving', depends=['train_GAN'])
-    def test_serving_model_is_saved(self, serving_root):
+    def test_serving_model_is_saved(self, serving_root: pathlib.Path):
         epochs, period = 4, 2
-        model_dir = min(serving_root.listdir())
-        assert (model_dir / 'tokenizer.json').isfile()
+        model_dir = min(serving_root.iterdir())
+        assert (model_dir / 'tokenizer.json').is_file()
 
         for epo in range(period, epochs, period):
             epo_dirname = model_dir / f'model_epo{epo}.pth'
-            assert epo_dirname.isfile()
+            assert epo_dirname.is_file()
 
     @pytest.mark.dependency(name='restore', depends=['train_GAN'])
-    def test_restore(self, checkpoint_root, serving_root):
+    def test_restore(self, checkpoint_root: pathlib.Path, serving_root):
         from scripts.train.restore_from_checkpoint import main, parse_args
-        restore_path = min(checkpoint_root.listdir())
+        restore_path = min(checkpoint_root.iterdir())
         main(parse_args(f'{restore_path} --epochs 6 --save-period 5'.split()))
         # successfully change saving_epochs
-        assert set(map(os.path.basename, restore_path.listdir())) == {
+        assert {p.name for p in restore_path.iterdir()} == {
             'args',
             'epoch2.pth',
             'epoch4.pth',
@@ -90,20 +90,20 @@ class TestSaveLoad:
 class TestEvaluate:
 
     @pytest.mark.dependency(name='generate_text', depends=['save_serving'])
-    def test_generate_text(self, tmpdir, serving_root):
+    def test_generate_text(self, tmp_path: pathlib.Path, serving_root: pathlib.Path):
         from scripts.evaluate.generate_text import main, parse_args
-        model_path = min(serving_root.listdir()) / 'model_epo4.pth'
-        export_path = tmpdir / 'generated_text.txt'
+        model_path = min(serving_root.iterdir()) / 'model_epo4.pth'
+        export_path = tmp_path / 'generated_text.txt'
         main(parse_args(f'--model {model_path} --export {export_path} --samples 100'.split()))
-        assert len(export_path.readlines()) == 100
+        assert len(export_path.read_text().splitlines()) == 100
 
     @pytest.mark.dependency(name='perplexity', depends=['save_serving'])
-    def test_perplexity(self, serving_root):
+    def test_perplexity(self, serving_root: pathlib.Path):
         from scripts.evaluate.perplexity import main, parse_args
-        model_path = min(serving_root.listdir()) / 'model_epo4.pth'
+        model_path = min(serving_root.iterdir()) / 'model_epo4.pth'
         main(parse_args(f'--model {model_path} --data test'.split()))
 
-    def test_evaluate_text(self, data_dir):
+    def test_evaluate_text(self, data_dir: pathlib.Path):
         from scripts.evaluate.evaluate_text import main, parse_args
         corpus_path = data_dir / 'train.txt'
         main(parse_args(f'--eval {corpus_path} --data test --bleu 5'.split()))
