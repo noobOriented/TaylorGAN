@@ -18,33 +18,31 @@ from .trainer_factory import TrainerCreator, create_optimizer_action_of
 class GANCreator(TrainerCreator):
 
     def create_trainer(self, generator_updater) -> GANTrainer:
-        loss_tuple, _, d_steps = self.args[GAN_ARGS]
         return GANTrainer(
             generator_updater=generator_updater,
             discriminator_updater=self.create_discriminator_updater(
                 self._discriminator,
-                discriminator_loss=loss_tuple.discriminator_loss,
+                discriminator_loss=self.args.loss.discriminator_loss,
             ),
-            d_steps=d_steps,
+            d_steps=self.args.d_steps,
         )
 
     def create_discriminator_updater(self, discriminator, discriminator_loss):
         return DiscriminatorUpdater(
             discriminator,
-            optimizer=self.args[D_OPTIMIZER_ARG](discriminator.trainable_variables),
+            optimizer=self.args.d_optimizer(discriminator.trainable_variables),
             losses=[
                 discriminator_loss,
-                *self.args[discriminator_factory.REGULARIZER_ARG],
+                *self.args.d_regularizers,
             ],
         )
 
     @functools.cached_property
     def objective(self):
-        loss_tuple, estimator = self.args[GAN_ARGS[:2]]
         return GANObjective(
             discriminator=self._discriminator,
-            generator_loss=loss_tuple.generator_loss,
-            estimator=estimator,
+            generator_loss=self.args.loss.generator_loss,
+            estimator=self.args.estimator,
         )
 
     @functools.cached_property

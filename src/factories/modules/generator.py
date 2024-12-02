@@ -1,7 +1,8 @@
 from functools import partial
+import typing as t
 
 import torch
-from flexparse import LookUpCall, Namespace, create_action
+from flexparse import LookUpCall, create_action
 from torch.nn import Embedding, GRUCell, Linear, Sequential
 
 from core.models import AutoRegressiveGenerator, Generator
@@ -14,14 +15,20 @@ from library.utils import NamedObject
 from ..utils import create_factory_action
 
 
-def create(args: Namespace, metadata: MetaData) -> Generator:
-    cell_func, fix_embeddings, tie_embeddings = args[MODEL_ARGS]
+class _GArgs(t.Protocol):
+    generator: t.Any
+    g_fix_embeddings: bool
+    tie_embeddings: bool
+
+
+def create(args: _GArgs, metadata: MetaData) -> Generator:
+    cell_func = args.generator
     print(f"Create generator: {cell_func.argument_info.arg_string}")
 
     embedding_matrix = torch.from_numpy(metadata.load_pretrained_embeddings())
-    embedder = Embedding.from_pretrained(embedding_matrix, freeze=fix_embeddings)
+    embedder = Embedding.from_pretrained(embedding_matrix, freeze=args.g_fix_embeddings)
     presoftmax_layer = Linear(embedder.embedding_dim, embedder.num_embeddings)
-    if tie_embeddings:
+    if args.tie_embeddings:
         presoftmax_layer.weight = embedder.weight
     else:
         presoftmax_layer.weight.data.copy_(embedder.weight)

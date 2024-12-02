@@ -7,7 +7,7 @@ from library.utils import ObjectWrapper, format_object, wraps_with_new_signature
 
 class OptimizerWrapper(ObjectWrapper):
 
-    def __init__(self, optimizer, clip_norm: float = 0):
+    def __init__(self, optimizer: torch.optim.Optimizer, clip_norm: float = 0):
         super().__init__(optimizer)
         self.optimizer = optimizer
         self.clip_norm = clip_norm
@@ -35,7 +35,7 @@ class OptimizerWrapper(ObjectWrapper):
         return format_object(self.optimizer, **kwargs)
 
     @classmethod
-    def as_constructor(cls, optimizer_cls):
+    def as_constructor(cls, optimizer_cls: type[torch.optim.Optimizer]):
 
         @wraps_with_new_signature(optimizer_cls)
         def wrapper(*args, clip_norm=0, **kwargs):

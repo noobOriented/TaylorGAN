@@ -1,12 +1,13 @@
 import torch
-from flexparse import LookUpCall, Namespace, create_action
+from flexparse import LookUpCall, create_action
 from torch.nn import Embedding, Linear
-
+import typing as t
 from core.models import Discriminator
 from core.objectives.regularizers import (
     EmbeddingRegularizer, GradientPenaltyRegularizer,
     LossScaler, SpectralRegularizer, WordVectorRegularizer,
 )
+from core.preprocess.record_objects import MetaData
 from library.torch_zoo.nn import LambdaModule, activations
 from library.torch_zoo.nn.masking import (
     MaskAvgPool1d, MaskConv1d, MaskGlobalAvgPool1d, MaskSequential,
@@ -17,12 +18,18 @@ from library.utils import ArgumentBinder, NamedObject
 from ..utils import create_factory_action
 
 
-def create(args: Namespace, meta_data) -> Discriminator:
-    network_func, fix_embeddings = args[MODEL_ARGS]
+class _DArgs(t.Protocol):
+    discriminator: t.Any
+    d_fix_embeddings: bool
+    tie_embeddings: bool
+
+
+def create(args: _DArgs, metadata: MetaData) -> Discriminator:
+    network_func = args.discriminator
     print(f"Create discriminator: {network_func.argument_info.arg_string}")
     embedder = Embedding.from_pretrained(
-        torch.from_numpy(meta_data.load_pretrained_embeddings()),
-        freeze=fix_embeddings,
+        torch.from_numpy(metadata.load_pretrained_embeddings()),
+        freeze=args.d_fix_embeddings,
     )
 
     return NamedObject(

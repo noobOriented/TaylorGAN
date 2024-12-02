@@ -19,8 +19,8 @@ def create(args, meta_data, generator: Generator) -> Trainer:
     creator = args.creator_cls(args, meta_data, generator)
     generator_updater = GeneratorUpdater(
         generator,
-        optimizer=args[G_OPTIMIZER_ARG](generator.trainable_variables),
-        losses=[creator.objective] + args[generator_factory.REGULARIZER_ARG],
+        optimizer=args.g_optimizer(generator.trainable_variables),
+        losses=[creator.objective] + args.g_regularizers,
     )
     return creator.create_trainer(generator_updater)
 

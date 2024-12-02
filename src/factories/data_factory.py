@@ -2,8 +2,9 @@ import os
 
 import yaml
 from dotenv import load_dotenv
-from flexparse import SUPPRESS, ArgumentParser, IntRange, LookUp, Namespace, create_action
+from flexparse import SUPPRESS, ArgumentParser, IntRange, LookUp, create_action
 
+from configs import DataConfigs
 from core.preprocess import UttutPreprocessor
 from core.preprocess.config_objects import CorpusConfig, LanguageConfig
 from core.preprocess.record_objects import MetaData, TextDataset
@@ -25,12 +26,11 @@ LANGUAGE_CONFIGS = {
 }
 
 
-def preprocess(args: Namespace) -> tuple[dict[str, TextDataset], MetaData]:
-    dataset, maxlen, vocab_size = args[ARGS]
-    print(f"data_id: {format_id(dataset)}")
+def preprocess(args: DataConfigs) -> tuple[dict[str, TextDataset], MetaData]:
+    print(f"data_id: {format_id(args.dataset)}")
     print(f"preprocessor_id {format_id('uttut')}")
-    preprocessor = UttutPreprocessor(maxlen=maxlen, vocab_size=vocab_size)
-    return preprocessor.preprocess(dataset, return_meta=True)
+    preprocessor = UttutPreprocessor(maxlen=args.maxlen, vocab_size=args.vocab_size)
+    return preprocessor.preprocess(args.dataset, return_meta=True)
 
 
 def load_corpus_table(path):
