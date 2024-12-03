@@ -30,7 +30,8 @@ def preprocess(args: DataConfigs) -> tuple[dict[str, TextDataset], MetaData]:
     print(f"data_id: {format_id(args.dataset)}")
     print(f"preprocessor_id {format_id('uttut')}")
     preprocessor = UttutPreprocessor(maxlen=args.maxlen, vocab_size=args.vocab_size)
-    return preprocessor.preprocess(args.dataset, return_meta=True)
+    corpus_config = LookUp(load_corpus_table(CONFIG_PATH))(args.dataset)
+    return preprocessor.preprocess(corpus_config, return_meta=True)
 
 
 def load_corpus_table(path):
@@ -63,7 +64,6 @@ def parse_config(corpus_dict):
 ARGS = [
     create_action(
         '--dataset',
-        type=LookUp(load_corpus_table(CONFIG_PATH)),
         required=True,
         default=SUPPRESS,
         help='the choice of corpus.',

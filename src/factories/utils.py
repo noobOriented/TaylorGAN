@@ -1,24 +1,4 @@
-import typing as t
-
-from flexparse import Action, ArgumentParser, create_action
-
-
-def create_factory_action(
-    *args,
-    type: t.Callable,  # noqa
-    help_prefix: str = '',
-    default=None,
-    **kwargs,
-) -> Action:
-    return create_action(
-        *args,
-        type=type,
-        default=default,
-        help=(
-            help_prefix + "custom options and registry: \n" + "\n".join(type.get_helps()) + "\n"
-        ),
-        **kwargs,
-    )
+from flexparse import Action, ArgumentParser
 
 
 def parent_parser(

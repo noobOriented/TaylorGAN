@@ -4,7 +4,7 @@ import abc
 import typing as t
 
 import torch
-from flexparse import Action, ArgumentParser, LookUpCall
+from flexparse import Action, ArgumentParser, LookUpCall, create_action
 
 from core.models import Generator
 from core.train import GeneratorUpdater, Trainer
@@ -12,40 +12,43 @@ from core.train.optimizer import OptimizerWrapper
 from factories.modules import generator_factory
 from library.utils import ArgumentBinder
 
-from ..utils import create_factory_action
-
 
 def create(args, meta_data, generator: Generator) -> Trainer:
-    creator = args.creator_cls(args, meta_data, generator)
+    creator: TrainerCreator = args.creator_cls(args, meta_data, generator)
     generator_updater = GeneratorUpdater(
         generator,
-        optimizer=args.g_optimizer(generator.trainable_variables),
-        losses=[creator.objective] + args.g_regularizers,
+        optimizer=_OPTIMIZERS(args.g_optimizer)(generator.trainable_variables),
+        losses=[creator.objective] + [
+            generator_factory.G_REGS(s)
+            for s in args.g_regularizers
+        ],  # TODO
     )
     return creator.create_trainer(generator_updater)
 
 
 def create_optimizer_action_of(module_name: str):
-    return create_factory_action(
+    return create_action(
         f'--{module_name[0]}-optimizer',
-        type=LookUpCall(
-            {
-                key: ArgumentBinder(
-                    OptimizerWrapper.as_constructor(optim_cls),
-                    preserved=['params'],
-                )
-                for key, optim_cls in [
-                    ('sgd', torch.optim.SGD),
-                    ('rmsprop', torch.optim.RMSprop),
-                    ('adam', torch.optim.Adam),
-                ]
-            },
-        ),
         default='adam(lr=1e-4, betas=(0.5, 0.999), clip_norm=10)',
-        help_prefix=f"{module_name}'s optimizer.\n",
+        help=(
+            f"{module_name}'s optimizer.\ncustom options and registry: \n" + "\n".join(_OPTIMIZERS.get_helps()) + "\n"
+        ),
     )
 
 
+_OPTIMIZERS = LookUpCall(
+    {
+        key: ArgumentBinder(
+            OptimizerWrapper.as_constructor(optim_cls),
+            preserved=['params'],
+        )
+        for key, optim_cls in [
+            ('sgd', torch.optim.SGD),
+            ('rmsprop', torch.optim.RMSprop),
+            ('adam', torch.optim.Adam),
+        ]
+    },
+)
 G_OPTIMIZER_ARG = create_optimizer_action_of('generator')
 
 

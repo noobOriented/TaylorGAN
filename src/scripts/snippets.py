@@ -20,7 +20,7 @@ def set_package_verbosity(debug):
         tf.logging.set_verbosity(tf.logging.ERROR)
 
 
-def set_global_random_seed(seed: int):
+def set_global_random_seed(seed: int | None):
     print(f"seed = {seed}")
     if seed is not None:
         random.seed(seed)

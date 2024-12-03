@@ -15,8 +15,6 @@ from library.torch_zoo.nn.masking import (
 from library.torch_zoo.nn.resnet import ResBlock
 from library.utils import ArgumentBinder, NamedObject
 
-from ..utils import create_factory_action
-
 
 class _DArgs(t.Protocol):
     discriminator: t.Any
@@ -25,7 +23,7 @@ class _DArgs(t.Protocol):
 
 
 def create(args: _DArgs, metadata: MetaData) -> Discriminator:
-    network_func = args.discriminator
+    network_func = _D_MODELS(args.discriminator)
     print(f"Create discriminator: {network_func.argument_info.arg_string}")
     embedder = Embedding.from_pretrained(
         torch.from_numpy(metadata.load_pretrained_embeddings()),
@@ -80,21 +78,23 @@ def resnet(input_size, activation: activations.TYPE_HINT = 'relu'):
     )
 
 
+_D_MODELS = LookUpCall(
+    {
+        key: ArgumentBinder(func, preserved=['input_size'])
+        for key, func in [
+            ('cnn', cnn),
+            ('resnet', resnet),
+            ('test', lambda input_size: MaskGlobalAvgPool1d(dim=1)),
+        ]
+    },
+    set_info=True,
+)
+
 MODEL_ARGS = [
-    create_factory_action(
+    create_action(
         '-d', '--discriminator',
-        type=LookUpCall(
-            {
-                key: ArgumentBinder(func, preserved=['input_size'])
-                for key, func in [
-                    ('cnn', cnn),
-                    ('resnet', resnet),
-                    ('test', lambda input_size: MaskGlobalAvgPool1d(dim=1)),
-                ]
-            },
-            set_info=True,
-        ),
         default="cnn(activation='elu')",
+        help="custom options and registry: \n" + "\n".join(_D_MODELS.get_helps()) + "\n",
     ),
     create_action(
         '--d-fix-embeddings',
@@ -102,16 +102,16 @@ MODEL_ARGS = [
         help="whether to fix embeddings.",
     ),
 ]
-
-REGULARIZER_ARG = create_factory_action(
+D_REGS = LookUpCall({
+    'spectral': LossScaler.as_constructor(SpectralRegularizer),
+    'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
+    'grad_penalty': LossScaler.as_constructor(GradientPenaltyRegularizer),
+    'word_vec': LossScaler.as_constructor(WordVectorRegularizer),
+})
+REGULARIZER_ARG = create_action(
     '--d-regularizers',
-    type=LookUpCall({
-        'spectral': LossScaler.as_constructor(SpectralRegularizer),
-        'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
-        'grad_penalty': LossScaler.as_constructor(GradientPenaltyRegularizer),
-        'word_vec': LossScaler.as_constructor(WordVectorRegularizer),
-    }),
+    default=[],
     nargs='+',
     metavar="REGULARIZER(*args, **kwargs)",
-    default=[],
+    help="custom options and registry: \n" + "\n".join(D_REGS.get_helps()) + "\n",
 )

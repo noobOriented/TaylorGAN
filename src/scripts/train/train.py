@@ -1,24 +1,27 @@
 import sys
 
+from configs import GANTrainingConfigs, MLETrainingConfigs
 from core.train import DataLoader
 from core.train.callbacks import ModelCheckpoint
 from factories import callback_factory, data_factory, generator_factory, trainer_factory
+from factories.trainer_factory.GAN import GANCreator
+from factories.trainer_factory.MLE import MLECreator
 from factories.trainer_factory.trainer_factory import TrainerCreator
 from library.utils import logging_indent
 from scripts.snippets import set_global_random_seed
 
 
 def GAN_main():
-    from factories.trainer_factory.GAN import GANCreator
-    main(args=parse_args(sys.argv[1:], algorithm=GANCreator))
+    args = parse_args(sys.argv[1:], algorithm=GANCreator)
+    main(args=args)
 
 
 def MLE_main():
-    from factories.trainer_factory.MLE import MLECreator
-    main(args=parse_args(sys.argv[1:], algorithm=MLECreator))
+    args = parse_args(sys.argv[1:], algorithm=MLECreator)
+    main(args=args)
 
 
-def main(args, base_tag=None, checkpoint=None):
+def main(args: GANTrainingConfigs | MLETrainingConfigs, base_tag=None, checkpoint=None):
     with logging_indent("Set global random seed"):
         set_global_random_seed(args.random_seed)
 

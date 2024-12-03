@@ -11,8 +11,7 @@ from core.objectives.GAN import (
 from core.train import DiscriminatorUpdater, GANTrainer
 from factories.modules import discriminator_factory
 
-from ..utils import create_factory_action
-from .trainer_factory import TrainerCreator, create_optimizer_action_of
+from .trainer_factory import _OPTIMIZERS, TrainerCreator, create_optimizer_action_of
 
 
 class GANCreator(TrainerCreator):
@@ -22,7 +21,7 @@ class GANCreator(TrainerCreator):
             generator_updater=generator_updater,
             discriminator_updater=self.create_discriminator_updater(
                 self._discriminator,
-                discriminator_loss=self.args.loss.discriminator_loss,
+                discriminator_loss=self._loss.discriminator_loss,
             ),
             d_steps=self.args.d_steps,
         )
@@ -30,19 +29,20 @@ class GANCreator(TrainerCreator):
     def create_discriminator_updater(self, discriminator, discriminator_loss):
         return DiscriminatorUpdater(
             discriminator,
-            optimizer=self.args.d_optimizer(discriminator.trainable_variables),
-            losses=[
-                discriminator_loss,
-                *self.args.d_regularizers,
+            optimizer=_OPTIMIZERS(self.args.d_optimizer)(discriminator.trainable_variables),
+            losses=[discriminator_loss] + [
+                discriminator_factory.D_REGS(s)
+                for s in self.args.d_regularizers
             ],
         )
 
     @functools.cached_property
     def objective(self):
+        estimator = _ESTIMATORS(self.args.estimator)
         return GANObjective(
             discriminator=self._discriminator,
-            generator_loss=self.args.loss.generator_loss,
-            estimator=self.args.estimator,
+            generator_loss=self._loss.generator_loss,
+            estimator=estimator,
         )
 
     @functools.cached_property
@@ -65,30 +65,37 @@ class GANCreator(TrainerCreator):
     def optimizer_args(cls):
         return [D_OPTIMIZER_ARG]
 
-
-D_OPTIMIZER_ARG = create_optimizer_action_of('discriminator')
-GAN_ARGS = [
-    create_action(
-        '--loss',
-        type=LookUp({
+    @functools.cached_property
+    def _loss(self) -> GANLossTuple:
+        return LookUp({
             'alt': GANLossTuple(lambda fake_score: BCE(fake_score, labels=1.)),  # RKL - 2JS
             'JS': GANLossTuple(lambda fake_score: -BCE(fake_score, labels=0.)),  # 2JS
             'KL': GANLossTuple(lambda fake_score: -torch.exp(fake_score)),  # -sig / (1 - sig)
             'RKL': GANLossTuple(lambda fake_score: -fake_score),  # log((1 - sig) / sig)
-        }),
+        })(self.args.loss)
+
+
+_ESTIMATORS = LookUpCall({
+    'reinforce': ReinforceEstimator,
+    'st': StraightThroughEstimator,
+    'taylor': TaylorEstimator,
+    'gumbel': GumbelSoftmaxEstimator,
+})
+D_OPTIMIZER_ARG = create_optimizer_action_of('discriminator')
+GAN_ARGS = [
+    create_action(
+        '--loss',
         default='RKL',
         help='loss function pair of GAN.',
     ),
-    create_factory_action(
+    create_action(
         '--estimator',
-        type=LookUpCall({
-            'reinforce': ReinforceEstimator,
-            'st': StraightThroughEstimator,
-            'taylor': TaylorEstimator,
-            'gumbel': GumbelSoftmaxEstimator,
-        }),
         default='taylor',
-        help_prefix="gradient estimator for discrete sampling.\n",
+        help='\n'.join([
+            'gradient estimator for discrete sampling.',
+            'custom options and registry: ',
+            *_ESTIMATORS.get_helps(),
+        ]) + "\n",
     ),
     create_action(
         '--d-steps',
