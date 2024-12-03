@@ -2,7 +2,7 @@ from functools import partial
 import typing as t
 
 import torch
-from flexparse import LookUpCall, create_action
+from flexparse import LookUpCall
 from torch.nn import Embedding, GRUCell, Linear, Sequential
 
 from core.models import AutoRegressiveGenerator, Generator
@@ -57,33 +57,8 @@ _G_MODELS = LookUpCall(
     },
     set_info=True,
 )
-MODEL_ARGS = [
-    create_action(
-        '-g', '--generator',
-        default='gru',
-        help="custom options and registry: \n" + "\n".join(_G_MODELS.get_helps()) + "\n",
-    ),
-    create_action(
-        '--tie-embeddings',
-        action='store_true',
-        help="whether to tie the weights of generator's input/presoftmax embeddings.",
-    ),
-    create_action(
-        '--g-fix-embeddings',
-        action='store_true',
-        help="whether to fix embeddings.",
-    ),
-]
-
 G_REGS = LookUpCall({
     'spectral': LossScaler.as_constructor(SpectralRegularizer),
     'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
     'entropy': LossScaler.as_constructor(EntropyRegularizer),
 })
-REGULARIZER_ARG = create_action(
-    '--g-regularizers',
-    nargs='+',
-    metavar="REGULARIZER(*args, **kwargs)",
-    default=[],
-    help="custom options and registry: \n" + "\n".join(G_REGS.get_helps()) + "\n",
-)

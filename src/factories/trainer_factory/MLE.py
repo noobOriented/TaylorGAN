@@ -12,19 +12,3 @@ class MLECreator(TrainerCreator):
     @property
     def objective(self):
         return MLEObjective()
-
-    @classmethod
-    def model_args(cls):
-        return []
-
-    @classmethod
-    def objective_args(cls):
-        return []
-
-    @classmethod
-    def regularizer_args(cls):
-        return []
-
-    @classmethod
-    def optimizer_args(cls):
-        return []

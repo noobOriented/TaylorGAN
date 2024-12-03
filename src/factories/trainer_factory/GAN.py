@@ -1,7 +1,7 @@
 import functools
 
 import torch
-from flexparse import IntRange, LookUp, LookUpCall, create_action
+from flexparse import LookUpCall
 
 from core.models import Discriminator
 from core.objectives.GAN import (
@@ -11,7 +11,7 @@ from core.objectives.GAN import (
 from core.train import DiscriminatorUpdater, GANTrainer
 from factories.modules import discriminator_factory
 
-from .trainer_factory import _OPTIMIZERS, TrainerCreator, create_optimizer_action_of
+from .trainer_factory import _OPTIMIZERS, TrainerCreator
 
 
 class GANCreator(TrainerCreator):
@@ -49,30 +49,14 @@ class GANCreator(TrainerCreator):
     def _discriminator(self) -> Discriminator:
         return discriminator_factory.create(self.args, self.meta_data)
 
-    @classmethod
-    def model_args(cls):
-        return discriminator_factory.MODEL_ARGS
-
-    @classmethod
-    def objective_args(cls):
-        return GAN_ARGS
-
-    @classmethod
-    def regularizer_args(cls):
-        return [discriminator_factory.REGULARIZER_ARG]
-
-    @classmethod
-    def optimizer_args(cls):
-        return [D_OPTIMIZER_ARG]
-
     @functools.cached_property
     def _loss(self) -> GANLossTuple:
-        return LookUp({
+        return {
             'alt': GANLossTuple(lambda fake_score: BCE(fake_score, labels=1.)),  # RKL - 2JS
             'JS': GANLossTuple(lambda fake_score: -BCE(fake_score, labels=0.)),  # 2JS
             'KL': GANLossTuple(lambda fake_score: -torch.exp(fake_score)),  # -sig / (1 - sig)
             'RKL': GANLossTuple(lambda fake_score: -fake_score),  # log((1 - sig) / sig)
-        })(self.args.loss)
+        }[self.args.loss]
 
 
 _ESTIMATORS = LookUpCall({
@@ -81,26 +65,3 @@ _ESTIMATORS = LookUpCall({
     'taylor': TaylorEstimator,
     'gumbel': GumbelSoftmaxEstimator,
 })
-D_OPTIMIZER_ARG = create_optimizer_action_of('discriminator')
-GAN_ARGS = [
-    create_action(
-        '--loss',
-        default='RKL',
-        help='loss function pair of GAN.',
-    ),
-    create_action(
-        '--estimator',
-        default='taylor',
-        help='\n'.join([
-            'gradient estimator for discrete sampling.',
-            'custom options and registry: ',
-            *_ESTIMATORS.get_helps(),
-        ]) + "\n",
-    ),
-    create_action(
-        '--d-steps',
-        type=IntRange(minval=1),
-        default=1,
-        help='update generator every n discriminator steps.',
-    ),
-]

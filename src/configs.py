@@ -13,14 +13,20 @@ class _BaseModelExtraForbid(pydantic.BaseModel, extra='forbid'):
 
 
 class DataConfigs(_BaseModelExtraForbid):
-    dataset: str
-    maxlen: pydantic.PositiveInt | None = None
-    vocab_size: pydantic.PositiveInt | None = None
+    dataset: t.Annotated[str, pydantic.Field(description='the choice of corpus.')]
+    maxlen: t.Annotated[int | None, pydantic.Field(ge=1, description='the max length of sequence padding.')] = None
+    vocab_size: t.Annotated[
+        int | None,
+        pydantic.Field(ge=1, description='the maximum number of tokens. ordered by descending frequency.'),
+    ] = None
 
 
 class ModelConfigs(_BaseModelExtraForbid):
     generator: str = 'gru'
-    tie_embeddings: bool = False
+    tie_embeddings: t.Annotated[
+        bool,
+        pydantic.Field(description="whether to tie the weights of generator's input/presoftmax embeddings."),
+    ] = False
     g_fix_embeddings: bool = False
 
 
@@ -30,15 +36,15 @@ class GANModelConfigs(ModelConfigs):
 
 
 class ObjectiveConfigs(_BaseModelExtraForbid):
-    g_regularizers: list = []
+    g_regularizers: list[str] = []
 
 
 class GANObjectiveConfigs(_BaseModelExtraForbid):
-    loss: str = 'RKL'  # TODO args
-    estimator: str = 'taylor'  # TODO args
-    d_steps: pydantic.PositiveInt = 1
-    g_regularizers: list = []
-    d_regularizers: list = []
+    loss: t.Annotated[str, pydantic.Field(description='loss function pair of GAN.')] = 'RKL'
+    estimator: t.Annotated[str, pydantic.Field(description='gradient estimator for discrete sampling.')] = 'taylor'
+    d_steps: t.Annotated[int, pydantic.Field(ge=1, description='update generator every n discriminator steps.')] = 1
+    g_regularizers: list[str] = []
+    d_regularizers: list[str] = []
 
 
 class OptimizerConfigs(_BaseModelExtraForbid):
@@ -51,14 +57,20 @@ class GANOptimizerConfigs(_BaseModelExtraForbid):
 
 
 class TrainConfigs(_BaseModelExtraForbid):
-    epochs: pydantic.PositiveInt = 10_000
-    batch_size: pydantic.PositiveInt = 64
-    random_seed: int | None = None
+    epochs: t.Annotated[int, pydantic.Field(ge=1, description='number of training epochs.')] = 10_000
+    batch_size: t.Annotated[int, pydantic.Field(ge=1, description='size of data mini-batch.')] = 64
+    random_seed: t.Annotated[int | None, pydantic.Field(description='the global random seed.')] = None
 
 
 class EvaluateConfigs(_BaseModelExtraForbid):
-    bleu: t.Annotated[int, pydantic.Field(ge=1, le=5)] = 5
-    fed: pydantic.PositiveInt | None = None
+    bleu: t.Annotated[
+        int,
+        pydantic.Field(ge=1, le=5, description='longest n-gram to calculate BLEU/SelfBLEU score.'),
+    ] = 5
+    fed: t.Annotated[
+        int | None,
+        pydantic.Field(description='number of sample size for FED score.'),
+    ] = None
 
 
 class SaveConfigs(_BaseModelExtraForbid):
@@ -68,8 +80,14 @@ class SaveConfigs(_BaseModelExtraForbid):
 
 
 class LoggingConfigs(_BaseModelExtraForbid):
-    tensorboard: pathlib.Path | None = None
-    tags: list[str] = []
+    tensorboard: t.Annotated[
+        pathlib.Path | None,
+        pydantic.Field(description='whether to log experiment on tensorboard.')
+    ] = None
+    tags: t.Annotated[
+        list[str],
+        pydantic.Field(description='additional tags to configure this training (will be used in tensorboard).'),
+    ] = []
 
 
 class _CommonTrainingConfigs(DataConfigs, TrainConfigs, EvaluateConfigs, SaveConfigs, LoggingConfigs):

@@ -1,5 +1,5 @@
 import torch
-from flexparse import LookUpCall, create_action
+from flexparse import LookUpCall
 from torch.nn import Embedding, Linear
 import typing as t
 from core.models import Discriminator
@@ -90,28 +90,10 @@ _D_MODELS = LookUpCall(
     set_info=True,
 )
 
-MODEL_ARGS = [
-    create_action(
-        '-d', '--discriminator',
-        default="cnn(activation='elu')",
-        help="custom options and registry: \n" + "\n".join(_D_MODELS.get_helps()) + "\n",
-    ),
-    create_action(
-        '--d-fix-embeddings',
-        action='store_true',
-        help="whether to fix embeddings.",
-    ),
-]
+
 D_REGS = LookUpCall({
     'spectral': LossScaler.as_constructor(SpectralRegularizer),
     'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
     'grad_penalty': LossScaler.as_constructor(GradientPenaltyRegularizer),
     'word_vec': LossScaler.as_constructor(WordVectorRegularizer),
 })
-REGULARIZER_ARG = create_action(
-    '--d-regularizers',
-    default=[],
-    nargs='+',
-    metavar="REGULARIZER(*args, **kwargs)",
-    help="custom options and registry: \n" + "\n".join(D_REGS.get_helps()) + "\n",
-)

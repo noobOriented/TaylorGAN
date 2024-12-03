@@ -2,7 +2,7 @@ import os
 
 import yaml
 from dotenv import load_dotenv
-from flexparse import SUPPRESS, ArgumentParser, IntRange, LookUp, create_action
+from flexparse import SUPPRESS, ArgumentParser, IntRange, create_action
 
 from configs import DataConfigs
 from core.preprocess import UttutPreprocessor
@@ -30,7 +30,7 @@ def preprocess(args: DataConfigs) -> tuple[dict[str, TextDataset], MetaData]:
     print(f"data_id: {format_id(args.dataset)}")
     print(f"preprocessor_id {format_id('uttut')}")
     preprocessor = UttutPreprocessor(maxlen=args.maxlen, vocab_size=args.vocab_size)
-    corpus_config = LookUp(load_corpus_table(CONFIG_PATH))(args.dataset)
+    corpus_config = load_corpus_table(CONFIG_PATH)[args.dataset]
     return preprocessor.preprocess(corpus_config, return_meta=True)
 
 
