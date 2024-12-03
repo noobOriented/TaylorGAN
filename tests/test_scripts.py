@@ -36,7 +36,7 @@ class TestTrain:
 
     @pytest.mark.dependency(name='train_GAN')
     def test_GAN(self, serving_root, checkpoint_root):
-        from scripts.train import GAN
+        from scripts.train import train
         sys.argv = ' '.join([
             'scripts/train/GAN.py --data test',
             '-g test -d test --estimator taylor',
@@ -48,17 +48,17 @@ class TestTrain:
             '--bleu 2',
             f'--serv {serving_root} --ckpt {checkpoint_root} --save-period 2',
         ]).split()
-        GAN.main()
+        train.GAN_main()
 
     def test_MLE(self, serving_root, checkpoint_root):
-        from scripts.train import MLE
+        from scripts.train import train
         sys.argv = ' '.join([
             'scripts/train/MLE.py --data test',
             '-g test --g-op sgd(1e-3)',
             '--epochs 4 --batch 2',
             f'--serv {serving_root} --ckpt {checkpoint_root} --save-period 2',
         ]).split()
-        MLE.main()
+        train.MLE_main()
 
 
 class TestSaveLoad:
