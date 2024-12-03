@@ -1,9 +1,10 @@
 import os
 import pathlib
 
+import pydantic
+
+from configs import GANTrainingConfigs, MLETrainingConfigs
 from core.train.callbacks import ModelCheckpoint
-from factories.trainer_factory.GAN import GANCreator
-from factories.trainer_factory.MLE import MLECreator
 
 from . import train
 
@@ -13,17 +14,15 @@ def main(args):
     main_args_path = restore_path / 'args'
     try:
         with open(main_args_path, 'r') as f_in:
-            main_argv = f_in.read().split()
+            main_args: GANTrainingConfigs | MLETrainingConfigs = pydantic.TypeAdapter(
+                GANTrainingConfigs | MLETrainingConfigs,
+            ).validate_json(f_in.read())
     except FileNotFoundError:
         raise FileNotFoundError(f"{main_args_path} not found, checkpoint can't be restored.")
 
-    # HACK
-    algorithm = GANCreator if 'GAN' in main_argv[0] else MLECreator
-    train_args = train.parse_args(main_argv[1:], algorithm=algorithm)
-    train_args.__dict__.update(args.__dict__)
-
+    main_args.__dict__.update(args.__dict__)
     train.main(
-        train_args,
+        main_args,
         base_tag=os.path.basename(restore_path),
         checkpoint=ModelCheckpoint.latest_checkpoint(restore_path),
     )

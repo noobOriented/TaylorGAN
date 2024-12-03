@@ -1,24 +1,9 @@
-import sys
-
 from configs import GANTrainingConfigs, MLETrainingConfigs
 from core.train import DataLoader
 from core.train.callbacks import ModelCheckpoint
 from factories import callback_factory, data_factory, generator_factory, trainer_factory
-from factories.trainer_factory.GAN import GANCreator
-from factories.trainer_factory.MLE import MLECreator
-from factories.trainer_factory.trainer_factory import TrainerCreator
 from library.utils import logging_indent
 from scripts.snippets import set_global_random_seed
-
-
-def GAN_main():
-    args = parse_args(sys.argv[1:], algorithm=GANCreator)
-    main(args=args)
-
-
-def MLE_main():
-    args = parse_args(sys.argv[1:], algorithm=MLECreator)
-    main(args=args)
 
 
 def main(args: GANTrainingConfigs | MLETrainingConfigs, base_tag=None, checkpoint=None):
@@ -61,28 +46,3 @@ def main(args: GANTrainingConfigs | MLETrainingConfigs, base_tag=None, checkpoin
         data_loader.skip_epochs(ModelCheckpoint.epoch_number(checkpoint))
 
     trainer.fit(data_loader)
-
-
-def parse_args(argv, algorithm: type[TrainerCreator]):
-    from flexparse import ArgumentParser
-    from flexparse.formatters import RawTextHelpFormatter
-
-    from scripts.parsers import (
-        develop_parser, evaluate_parser, logging_parser, save_parser, train_parser,
-    )
-
-    parser = ArgumentParser(
-        description='TextGAN.',
-        formatter_class=RawTextHelpFormatter,
-        fromfile_prefix_chars='@',
-        parents=[
-            data_factory.PARSER,
-            trainer_factory.create_parser(algorithm),
-            train_parser(),
-            evaluate_parser(),
-            save_parser(),
-            logging_parser(),
-            develop_parser(),
-        ],
-    )
-    return parser.parse_args(argv)

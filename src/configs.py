@@ -4,6 +4,8 @@ import pathlib
 import typing as t
 
 import pydantic
+from factories.trainer_factory.GAN import GANCreator
+from factories.trainer_factory.MLE import MLECreator
 
 
 class _BaseModelExtraForbid(pydantic.BaseModel, extra='forbid'):
@@ -75,8 +77,8 @@ class _CommonTrainingConfigs(DataConfigs, TrainConfigs, EvaluateConfigs, SaveCon
 
 
 class MLETrainingConfigs(_CommonTrainingConfigs, ModelConfigs, ObjectiveConfigs, OptimizerConfigs):
-    pass
+    creator_cls: t.ClassVar = MLECreator
 
 
 class GANTrainingConfigs(_CommonTrainingConfigs, GANModelConfigs, GANObjectiveConfigs, GANOptimizerConfigs):
-    pass
+    creator_cls: t.ClassVar = GANCreator
