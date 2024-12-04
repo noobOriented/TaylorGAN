@@ -1,8 +1,13 @@
+import argparse
+
 from core.evaluate import TextGenerator
 from factories import data_factory
+from scripts.parsers import load_parser
 
 
-def main(args):
+def main():
+    parser = argparse.ArgumentParser(parents=[data_factory.PARSER, load_parser()])
+    args = parser.parse_args()
     data_collection, meta = data_factory.preprocess(args)
     generator = TextGenerator.load_traced(args.model_path, tokenizer=meta.tokenizer)
     for tag, dataset in data_collection.items():
@@ -11,20 +16,5 @@ def main(args):
         print(f"Perplexity = {perplexity}")
 
 
-def parse_args(argv):
-    from flexparse import ArgumentParser
-
-    from scripts.parsers import develop_parser, load_parser
-
-    return ArgumentParser(
-        parents=[
-            data_factory.PARSER,
-            develop_parser(),
-            load_parser(),
-        ],
-    ).parse_args(argv)
-
-
 if __name__ == '__main__':
-    import sys
-    main(parse_args(sys.argv[1:]))
+    main()

@@ -2,14 +2,31 @@ import os
 import pathlib
 
 import pydantic
+import argparse
 
 from configs import GANTrainingConfigs, MLETrainingConfigs
 from core.train.callbacks import ModelCheckpoint
+from scripts.parsers import save_parser
 
 from . import train
 
 
-def main(args):
+def main():
+    parser = argparse.ArgumentParser(
+        parents=[save_parser(argument_default=argparse.SUPPRESS)],
+        argument_default=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        'path',
+        type=pathlib.Path,
+        help="load checkpoint from this file prefix.",
+    )
+    parser.add_argument(
+        '--epochs',
+        type=int,  # IntRange(1),
+        help="number of training epochs. (default: same as original args.)",
+    )
+    args = parser.parse_args()
     restore_path = args.path
     main_args_path = restore_path / 'args'
     try:
@@ -28,28 +45,5 @@ def main(args):
     )
 
 
-def parse_args(argv):
-    from flexparse import SUPPRESS, ArgumentParser, IntRange
-
-    from scripts.parsers import save_parser
-
-    parser = ArgumentParser(
-        parents=[save_parser(argument_default=SUPPRESS)],
-        argument_default=SUPPRESS,
-    )
-    parser.add_argument(
-        'path',
-        type=pathlib.Path,
-        help="load checkpoint from this file prefix.",
-    )
-    parser.add_argument(
-        '--epochs',
-        type=IntRange(1),
-        help="number of training epochs. (default: same as original args.)",
-    )
-    return parser.parse_args(argv)
-
-
 if __name__ == '__main__':
-    import sys
-    main(parse_args(sys.argv[1:]))
+    main()

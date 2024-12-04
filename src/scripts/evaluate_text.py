@@ -1,3 +1,4 @@
+import argparse
 import os
 import typing as t
 
@@ -5,6 +6,7 @@ from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
 from core.preprocess.record_objects import TextDataset
 from factories import data_factory
 from library.utils import random_sample
+from scripts.parsers import evaluate_parser
 
 
 # HUB_URL = "https://tfhub.dev/google/universal-sentence-encoder-large/3"
@@ -12,7 +14,11 @@ HUB_URL = "https://tfhub.dev/google/universal-sentence-encoder/2"
 RLM_EPOCHS = 100
 
 
-def main(args):
+def main():
+    parser = argparse.ArgumentParser(parents=[data_factory.PARSER, evaluate_parser()])
+    parser.add_argument('--eval-path', required=True)
+    args = parser.parse_args()
+
     data_collection, meta_data = data_factory.preprocess(args)
     tokenizer = meta_data.tokenizer
 
@@ -94,20 +100,5 @@ class FEDMetrics:
         }
 
 
-def parse_args(argv):
-    from flexparse import ArgumentParser
-
-    from scripts.parsers import develop_parser, evaluate_parser
-
-    parser = ArgumentParser(parents=[
-        data_factory.PARSER,
-        evaluate_parser(),
-        develop_parser(),
-    ])
-    parser.add_argument('--eval-path', required=True)
-    return parser.parse_args(argv)
-
-
 if __name__ == '__main__':
-    import sys
-    main(parse_args(sys.argv[1:]))
+    main()
