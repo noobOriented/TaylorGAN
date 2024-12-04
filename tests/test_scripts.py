@@ -4,6 +4,7 @@ import pathlib
 import pytest
 
 from configs import GANTrainingConfigs, MLETrainingConfigs
+from scripts import evaluate_text, generate_text, perplexity, restore_from_checkpoint, train
 
 
 @pytest.fixture(scope='session')
@@ -37,7 +38,6 @@ class TestTrain:
 
     @pytest.mark.dependency(name='train_GAN')
     def test_GAN(self, serving_root, checkpoint_root):
-        from scripts.train import train
         args = GANTrainingConfigs(
             dataset='test',
             generator='test',
@@ -52,7 +52,6 @@ class TestTrain:
         train.main(args)
 
     def test_MLE(self, serving_root, checkpoint_root):
-        from scripts.train import train
         args = MLETrainingConfigs(
             dataset='test',
             generator='test',
@@ -76,10 +75,11 @@ class TestSaveLoad:
             assert epo_dirname.is_file()
 
     @pytest.mark.dependency(name='restore', depends=['train_GAN'])
-    def test_restore(self, checkpoint_root: pathlib.Path, serving_root):
-        from scripts.train.restore_from_checkpoint import main, parse_args
+    def test_restore(self, checkpoint_root: pathlib.Path):
         restore_path = min(checkpoint_root.iterdir())
-        main(parse_args(f'{restore_path} --epochs 6 --save-period 5'.split()))
+        restore_from_checkpoint.main(
+            restore_from_checkpoint.parse_args(f'{restore_path} --epochs 6 --save-period 5'.split()),
+        )
         # successfully change saving_epochs
         assert {p.name for p in restore_path.iterdir()} == {
             'args',
@@ -93,19 +93,22 @@ class TestEvaluate:
 
     @pytest.mark.dependency(name='generate_text', depends=['save_serving'])
     def test_generate_text(self, tmp_path: pathlib.Path, serving_root: pathlib.Path):
-        from scripts.evaluate.generate_text import main, parse_args
         model_path = min(serving_root.iterdir()) / 'model_epo4.pth'
         export_path = tmp_path / 'generated_text.txt'
-        main(parse_args(f'--model {model_path} --export {export_path} --samples 100'.split()))
+        generate_text.main(
+            generate_text.parse_args(f'--model {model_path} --export {export_path} --samples 100'.split()),
+        )
         assert len(export_path.read_text().splitlines()) == 100
 
     @pytest.mark.dependency(name='perplexity', depends=['save_serving'])
     def test_perplexity(self, serving_root: pathlib.Path):
-        from scripts.evaluate.perplexity import main, parse_args
         model_path = min(serving_root.iterdir()) / 'model_epo4.pth'
-        main(parse_args(f'--model {model_path} --data test'.split()))
+        perplexity.main(
+            perplexity.parse_args(f'--model {model_path} --data test'.split()),
+        )
 
     def test_evaluate_text(self, data_dir: pathlib.Path):
-        from scripts.evaluate.evaluate_text import main, parse_args
         corpus_path = data_dir / 'train.txt'
-        main(parse_args(f'--eval {corpus_path} --data test --bleu 5'.split()))
+        evaluate_text.main(
+            evaluate_text.parse_args(f'--eval {corpus_path} --data test --bleu 5'.split()),
+        )
