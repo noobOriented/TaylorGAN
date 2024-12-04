@@ -6,9 +6,6 @@ from flexparse import LookUpCall
 from torch.nn import Embedding, GRUCell, Linear, Sequential
 
 from core.models import AutoRegressiveGenerator, Generator
-from core.objectives.regularizers import (
-    EmbeddingRegularizer, EntropyRegularizer, LossScaler, SpectralRegularizer,
-)
 from core.preprocess.record_objects import MetaData
 from library.utils import NamedObject
 
@@ -57,8 +54,3 @@ _G_MODELS = LookUpCall(
     },
     set_info=True,
 )
-G_REGS = LookUpCall({
-    'spectral': LossScaler.as_constructor(SpectralRegularizer),
-    'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
-    'entropy': LossScaler.as_constructor(EntropyRegularizer),
-})

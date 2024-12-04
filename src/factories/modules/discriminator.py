@@ -3,10 +3,6 @@ from flexparse import LookUpCall
 from torch.nn import Embedding, Linear
 import typing as t
 from core.models import Discriminator
-from core.objectives.regularizers import (
-    EmbeddingRegularizer, GradientPenaltyRegularizer,
-    LossScaler, SpectralRegularizer, WordVectorRegularizer,
-)
 from core.preprocess.record_objects import MetaData
 from library.torch_zoo.nn import LambdaModule, activations
 from library.torch_zoo.nn.masking import (
@@ -89,11 +85,3 @@ _D_MODELS = LookUpCall(
     },
     set_info=True,
 )
-
-
-D_REGS = LookUpCall({
-    'spectral': LossScaler.as_constructor(SpectralRegularizer),
-    'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
-    'grad_penalty': LossScaler.as_constructor(GradientPenaltyRegularizer),
-    'word_vec': LossScaler.as_constructor(WordVectorRegularizer),
-})

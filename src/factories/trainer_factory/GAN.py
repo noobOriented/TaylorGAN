@@ -8,10 +8,14 @@ from core.objectives.GAN import (
     BCE, GANLossTuple, GANObjective, GumbelSoftmaxEstimator,
     ReinforceEstimator, StraightThroughEstimator, TaylorEstimator,
 )
+from core.objectives.regularizers import (
+    EmbeddingRegularizer, GradientPenaltyRegularizer,
+    LossScaler, SpectralRegularizer, WordVectorRegularizer,
+)
 from core.train import DiscriminatorUpdater, GANTrainer
 from factories.modules import discriminator_factory
 
-from .trainer_factory import _OPTIMIZERS, TrainerCreator
+from .trainer_factory import OPTIMIZERS, TrainerCreator
 
 
 class GANCreator(TrainerCreator):
@@ -29,9 +33,9 @@ class GANCreator(TrainerCreator):
     def create_discriminator_updater(self, discriminator, discriminator_loss):
         return DiscriminatorUpdater(
             discriminator,
-            optimizer=_OPTIMIZERS(self.args.d_optimizer)(discriminator.trainable_variables),
+            optimizer=OPTIMIZERS(self.args.d_optimizer)(discriminator.trainable_variables),
             losses=[discriminator_loss] + [
-                discriminator_factory.D_REGS(s)
+                _D_REGS(s)
                 for s in self.args.d_regularizers
             ],
         )
@@ -64,4 +68,10 @@ _ESTIMATORS = LookUpCall({
     'st': StraightThroughEstimator,
     'taylor': TaylorEstimator,
     'gumbel': GumbelSoftmaxEstimator,
+})
+_D_REGS = LookUpCall({
+    'spectral': LossScaler.as_constructor(SpectralRegularizer),
+    'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
+    'grad_penalty': LossScaler.as_constructor(GradientPenaltyRegularizer),
+    'word_vec': LossScaler.as_constructor(WordVectorRegularizer),
 })

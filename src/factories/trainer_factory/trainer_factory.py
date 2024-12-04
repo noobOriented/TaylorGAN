@@ -7,10 +7,12 @@ import torch
 from flexparse import LookUpCall
 
 from core.models import Generator
+from core.objectives.regularizers import (
+    EmbeddingRegularizer, EntropyRegularizer, LossScaler, SpectralRegularizer,
+)
 from core.preprocess.record_objects import MetaData
 from core.train import GeneratorUpdater, Trainer
 from core.train.optimizer import OptimizerWrapper
-from factories.modules import generator_factory
 from library.utils import ArgumentBinder
 
 
@@ -18,16 +20,21 @@ def create(args, metadata: MetaData, generator: Generator) -> Trainer:
     creator: TrainerCreator = args.creator_cls(args, metadata, generator)
     generator_updater = GeneratorUpdater(
         generator,
-        optimizer=_OPTIMIZERS(args.g_optimizer)(generator.trainable_variables),
+        optimizer=OPTIMIZERS(args.g_optimizer)(generator.trainable_variables),
         losses=[creator.objective] + [
-            generator_factory.G_REGS(s)
+            _G_REGS(s)
             for s in args.g_regularizers
         ],  # TODO
     )
     return creator.create_trainer(generator_updater)
 
 
-_OPTIMIZERS = LookUpCall(
+_G_REGS = LookUpCall({
+    'spectral': LossScaler.as_constructor(SpectralRegularizer),
+    'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
+    'entropy': LossScaler.as_constructor(EntropyRegularizer),
+})
+OPTIMIZERS = LookUpCall(
     {
         key: ArgumentBinder(
             OptimizerWrapper.as_constructor(optim_cls),
