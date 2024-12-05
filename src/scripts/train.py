@@ -3,7 +3,18 @@ from core.train import DataLoader
 from core.train.callbacks import ModelCheckpoint
 from factories import callback_factory, data_factory, generator_factory, trainer_factory
 from library.utils import logging_indent
+from scripts.parsers import parse_args_as
 from scripts.snippets import set_global_random_seed
+
+
+def GAN_main():
+    args = parse_args_as(GANTrainingConfigs)
+    main(args)
+
+
+def MLE_main():
+    args = parse_args_as(MLETrainingConfigs)
+    main(args)
 
 
 def main(args: GANTrainingConfigs | MLETrainingConfigs, base_tag=None, checkpoint=None):

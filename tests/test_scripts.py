@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 import pytest
 
-from configs import GANTrainingConfigs, MLETrainingConfigs
 from scripts import evaluate_text, generate_text, perplexity, restore_from_checkpoint, train
 
 
@@ -39,28 +38,31 @@ class TestTrain:
 
     @pytest.mark.dependency(name='train_GAN')
     def test_GAN(self, serving_root, checkpoint_root):
-        args = GANTrainingConfigs(
-            dataset='test',
-            generator='test',
-            g_optimizer='sgd(1e-3,clip_norm=1)',
-            g_regularizers=['embedding(0.1)', 'entropy(1e-5)'],
-            discriminator='test',
-            d_optimizer='sgd(1e-3,clip_norm=1)',
-            d_regularizers=['grad_penalty(10.)', 'spectral(0.1)', 'embedding(0.1)'],
-            epochs=4, batch_size=2, bleu=2,
-            serving_root=serving_root, checkpoint_root=checkpoint_root, save_period=2,
-        )
-        train.main(args)
+        with patch(
+            'sys.argv',
+            ' '.join([
+                '... --data test',
+                '--gen test --dis test --estimator taylor',
+                '--g-op sgd(1e-3,clip_norm=1) --g-reg embedding(0.1) entropy(1e-5)',
+                '--d-op sgd(1e-3,clip_norm=1) --d-reg grad_penalty(10) spectral(0.1) embedding(0.1)',
+                '--epochs 4 --batch 2',
+                '--bleu 2',
+                f'--serv {serving_root} --checkpoint {checkpoint_root} --save-period 2',
+            ]).split(),
+        ):
+            train.GAN_main()
 
     def test_MLE(self, serving_root, checkpoint_root):
-        args = MLETrainingConfigs(
-            dataset='test',
-            generator='test',
-            g_optimizer='sgd(1e-3)',
-            epochs=4, batch_size=2,
-            serving_root=serving_root, checkpoint_root=checkpoint_root, save_period=2,
-        )
-        train.main(args)
+        with patch(
+            'sys.argv',
+            ' '.join([
+                '... --data test',
+                '--gen test --g-op sgd(1e-3)',
+                '--epochs 4 --batch 2',
+                f'--serv {serving_root} --checkpoint {checkpoint_root} --save-period 2',
+            ]).split(),
+        ):
+            train.MLE_main()
 
 
 class TestSaveLoad:
@@ -78,7 +80,7 @@ class TestSaveLoad:
     @pytest.mark.dependency(name='restore', depends=['train_GAN'])
     def test_restore(self, checkpoint_root: pathlib.Path):
         restore_path = min(checkpoint_root.iterdir())
-        with patch('sys.argv', f'restore {restore_path} --epochs 6 --save-period 5'.split()):
+        with patch('sys.argv', f'... {restore_path} --epochs 6 --save-period 5'.split()):
             restore_from_checkpoint.main()
 
         # successfully change saving_epochs
@@ -96,7 +98,7 @@ class TestEvaluate:
     def test_generate_text(self, tmp_path: pathlib.Path, serving_root: pathlib.Path):
         model_path = min(serving_root.iterdir()) / 'model_epo4.pth'
         export_path = tmp_path / 'generated_text.txt'
-        with patch('sys.argv', f'generate --model {model_path} --export {export_path} --samples 100'.split()):
+        with patch('sys.argv', f'... --model {model_path} --export {export_path} --samples 100'.split()):
             generate_text.main()
 
         assert len(export_path.read_text().splitlines()) == 100
@@ -104,10 +106,10 @@ class TestEvaluate:
     @pytest.mark.dependency(name='perplexity', depends=['save_serving'])
     def test_perplexity(self, serving_root: pathlib.Path):
         model_path = min(serving_root.iterdir()) / 'model_epo4.pth'
-        with patch('sys.argv', f'perplexity --model {model_path} --data test'.split()):
+        with patch('sys.argv', f'... --model {model_path} --data test'.split()):
             perplexity.main()
 
     def test_evaluate_text(self, data_dir: pathlib.Path):
         corpus_path = data_dir / 'train.txt'
-        with patch('sys.argv', f'evaluate --eval {corpus_path} --data test --bleu 5'.split()):
+        with patch('sys.argv', f'... --eval {corpus_path} --data test --bleu 5'.split()):
             evaluate_text.main()
