@@ -7,7 +7,7 @@ from torch.nn import Embedding, GRUCell, Linear, Sequential
 
 from core.models import AutoRegressiveGenerator, Generator
 from core.preprocess.record_objects import MetaData
-from library.utils import LookUpCall, NamedObject
+from library.utils import LookUpCall
 
 
 class GeneratorConfigs(pydantic.BaseModel):
@@ -29,19 +29,15 @@ class GeneratorConfigs(pydantic.BaseModel):
         else:
             presoftmax_layer.weight.data.copy_(embedder.weight)
 
-        cell_func, info = _G_MODELS(self.generator, return_info=True)
-        cell = cell_func(embedder.embedding_dim)
-        return NamedObject(
-            AutoRegressiveGenerator(
-                cell=cell,
-                embedder=embedder,
-                output_layer=Sequential(
-                    Linear(cell.hidden_size, embedder.embedding_dim, bias=False),
-                    presoftmax_layer,
-                ),
-                special_token_config=metadata.special_token_config,
+        cell = _G_MODELS(self.generator)(embedder.embedding_dim)
+        return AutoRegressiveGenerator(
+            cell=cell,
+            embedder=embedder,
+            output_layer=Sequential(
+                Linear(cell.hidden_size, embedder.embedding_dim, bias=False),
+                presoftmax_layer,
             ),
-            name=info.func_name,
+            special_token_config=metadata.special_token_config,
         )
 
 

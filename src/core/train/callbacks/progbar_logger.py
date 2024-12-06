@@ -1,6 +1,9 @@
+import typing as t
+
 from tqdm import tqdm
 
 from core.train.pubsub_base import Subscriber
+from core.train.updaters import ModuleUpdater
 from library.utils import ExponentialMovingAverageMeter, format_highlight2, left_aligned
 from library.utils.logging import SEPARATION_LINE, TqdmRedirector
 
@@ -10,7 +13,7 @@ from .channels import channels
 
 class ProgbarLogger(Callback):
 
-    def __init__(self, desc: str, total: int, updaters):
+    def __init__(self, desc: str, total: int, updaters: t.Sequence[ModuleUpdater]):
         self.desc = format_highlight2(desc)
         self.total = total
         self.updaters = updaters
