@@ -4,56 +4,14 @@ import pathlib
 import typing as t
 
 import pydantic
-from factories.trainer_factory.GAN import GANCreator
-from factories.trainer_factory.MLE import MLECreator
+
+from factories.data_factory import DataConfigs
+from factories.modules.generator import GeneratorConfigs
+from factories.trainer_factory import GANObjectiveConfigs, MLEObjectiveConfigs
 
 
 class _BaseModelExtraForbid(pydantic.BaseModel, extra='forbid'):
     pass
-
-
-class DataConfigs(_BaseModelExtraForbid):
-    dataset: t.Annotated[str, pydantic.Field(description='the choice of corpus.')]
-    maxlen: t.Annotated[int | None, pydantic.Field(ge=1, description='the max length of sequence padding.')] = None
-    vocab_size: t.Annotated[
-        int | None,
-        pydantic.Field(ge=1, description='the maximum number of tokens. ordered by descending frequency.'),
-    ] = None
-
-
-class ModelConfigs(_BaseModelExtraForbid):
-    generator: str = 'gru'
-    tie_embeddings: t.Annotated[
-        bool,
-        pydantic.Field(description="whether to tie the weights of generator's input/presoftmax embeddings."),
-    ] = False
-    g_fix_embeddings: bool = False
-
-
-class GANModelConfigs(ModelConfigs):
-    discriminator: str = "cnn(activation='elu')"
-    d_fix_embeddings: bool = False
-
-
-class ObjectiveConfigs(_BaseModelExtraForbid):
-    g_regularizers: list[str] = []
-
-
-class GANObjectiveConfigs(_BaseModelExtraForbid):
-    loss: t.Annotated[str, pydantic.Field(description='loss function pair of GAN.')] = 'RKL'
-    estimator: t.Annotated[str, pydantic.Field(description='gradient estimator for discrete sampling.')] = 'taylor'
-    d_steps: t.Annotated[int, pydantic.Field(ge=1, description='update generator every n discriminator steps.')] = 1
-    g_regularizers: list[str] = []
-    d_regularizers: list[str] = []
-
-
-class OptimizerConfigs(_BaseModelExtraForbid):
-    g_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
-
-
-class GANOptimizerConfigs(_BaseModelExtraForbid):
-    g_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
-    d_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
 
 
 class TrainConfigs(_BaseModelExtraForbid):
@@ -94,9 +52,9 @@ class _CommonTrainingConfigs(DataConfigs, TrainConfigs, EvaluateConfigs, SaveCon
     profile: pathlib.Path | None = None
 
 
-class MLETrainingConfigs(_CommonTrainingConfigs, ModelConfigs, ObjectiveConfigs, OptimizerConfigs):
-    creator_cls: t.ClassVar = MLECreator
+class MLETrainingConfigs(_CommonTrainingConfigs, GeneratorConfigs, MLEObjectiveConfigs):
+    pass
 
 
-class GANTrainingConfigs(_CommonTrainingConfigs, GANModelConfigs, GANObjectiveConfigs, GANOptimizerConfigs):
-    creator_cls: t.ClassVar = GANCreator
+class GANTrainingConfigs(_CommonTrainingConfigs, GeneratorConfigs, GANObjectiveConfigs):
+    pass

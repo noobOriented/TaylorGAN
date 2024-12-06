@@ -1,6 +1,7 @@
-from functools import partial
 import typing as t
+from functools import partial
 
+import pydantic
 import torch
 from flexparse import LookUpCall
 from torch.nn import Embedding, GRUCell, Linear, Sequential
@@ -10,15 +11,17 @@ from core.preprocess.record_objects import MetaData
 from library.utils import NamedObject
 
 
-class _GArgs(t.Protocol):
-    generator: t.Any
-    g_fix_embeddings: bool
-    tie_embeddings: bool
+class GeneratorConfigs(pydantic.BaseModel):
+    generator: str = 'gru'
+    tie_embeddings: t.Annotated[
+        bool,
+        pydantic.Field(description="whether to tie the weights of generator's input/presoftmax embeddings."),
+    ] = False
+    g_fix_embeddings: bool = False
 
 
-def create(args: _GArgs, metadata: MetaData) -> Generator:
-    cell_func = _G_MODELS(args.generator)
-    print(f"Create generator: {cell_func.argument_info.arg_string}")
+def create(args: GeneratorConfigs, metadata: MetaData) -> Generator:
+    print(f"Create generator: {args.generator}")
 
     embedding_matrix = torch.from_numpy(metadata.load_pretrained_embeddings())
     embedder = Embedding.from_pretrained(embedding_matrix, freeze=args.g_fix_embeddings)
@@ -28,7 +31,8 @@ def create(args: _GArgs, metadata: MetaData) -> Generator:
     else:
         presoftmax_layer.weight.data.copy_(embedder.weight)
 
-    cell = cell_func(input_size=embedder.embedding_dim)
+    cell_func = _G_MODELS(args.generator)
+    cell: torch.nn.Module = cell_func(embedder.embedding_dim)
     return NamedObject(
         AutoRegressiveGenerator(
             cell=cell,

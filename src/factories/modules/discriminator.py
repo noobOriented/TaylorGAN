@@ -13,14 +13,13 @@ from library.utils import ArgumentBinder, NamedObject
 
 
 class _DArgs(t.Protocol):
-    discriminator: t.Any
+    discriminator: str
     d_fix_embeddings: bool
-    tie_embeddings: bool
 
 
 def create(args: _DArgs, metadata: MetaData) -> Discriminator:
+    print(f"Create discriminator: {args.discriminator}")
     network_func = _D_MODELS(args.discriminator)
-    print(f"Create discriminator: {network_func.argument_info.arg_string}")
     embedder = Embedding.from_pretrained(
         torch.from_numpy(metadata.load_pretrained_embeddings()),
         freeze=args.d_fix_embeddings,
