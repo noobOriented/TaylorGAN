@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import argparse
+import ast
+import inspect
+import re
 import typing as t
 
 import pydantic
-from dotenv import load_dotenv
-
-
-load_dotenv('.env')
 
 
 def parse_args_as[T: pydantic.BaseModel](typ: type[T], *, args: t.Sequence[str] | None = None) -> T:
@@ -25,7 +26,7 @@ def parse_args_as[T: pydantic.BaseModel](typ: type[T], *, args: t.Sequence[str] 
         parser.add_argument(
             flag,
             required=field.is_required(),
-            nargs='+' if lenient_issubclass(t.get_origin(arg_type), list) else None,
+            nargs='+' if _lenient_issubclass(t.get_origin(arg_type), list) else None,
             default=field.default,
             help=field.description,
         )
@@ -34,5 +35,69 @@ def parse_args_as[T: pydantic.BaseModel](typ: type[T], *, args: t.Sequence[str] 
     return typ.model_validate(namespace, from_attributes=True)
 
 
-def lenient_issubclass(cls, base: tuple[type] | type) -> bool:
+def _lenient_issubclass(cls, base: tuple[type] | type) -> bool:
     return isinstance(cls, type) and issubclass(cls, base)
+
+
+class LookUpCall[T]:
+
+    def __init__(self, choices: t.Mapping[str, t.Callable[..., T]]):
+        self.choices = choices
+
+    @t.overload
+    def __call__(self, arg_string: str, return_info: t.Literal[True]) -> tuple[T, ArgumentInfo]:
+        ...
+
+    @t.overload
+    def __call__(self, arg_string: str, return_info: t.Literal[False] = False) -> T:
+        ...
+
+    def __call__(self, arg_string: str, return_info: bool = False):
+        # clean color
+        ANSI_CLEANER = re.compile(r"(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]")
+        arg_string = ANSI_CLEANER.sub("", arg_string)
+        func_name, pos_args, kwargs = _get_func_name_and_args(arg_string)
+        func = self.choices[func_name]
+        result = func(*pos_args, **kwargs)
+        if return_info:
+            info = ArgumentInfo(arg_string, func_name, func, pos_args, kwargs)
+            return result, info
+        return result
+
+    def get_helps(self):
+        for key, func in self.choices.items():
+            yield f'{key}{inspect.signature(func)}'
+
+
+class ArgumentInfo(t.NamedTuple):
+    arg_string: str
+    func_name: str
+    func: t.Callable
+    args: list
+    kwargs: dict
+
+
+def _get_func_name_and_args(string: str) -> tuple[str, list, dict]:
+    node = ast.parse(string, mode='eval').body
+    if isinstance(node, ast.Name):
+        return node.id, [], {}
+    if not isinstance(node, ast.Call):
+        raise ValueError("can't be parsed as a call.")
+
+    return (
+        node.func.id,
+        [ast.literal_eval(arg) for arg in node.args],
+        dict_of_unique_keys(
+            (kw.arg, ast.literal_eval(kw.value))
+            for kw in node.keywords
+        ),
+    )
+
+
+def dict_of_unique_keys(items):
+    output = {}
+    for key, val in items:
+        if key in output:
+            raise ValueError(f"keyword argument repeated: {key}")
+        output[key] = val
+    return output

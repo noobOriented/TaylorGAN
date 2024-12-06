@@ -11,4 +11,4 @@ from .format_utils import (
 from .func_utils import ArgumentBinder, ObjectWrapper, wraps_with_new_signature
 from .iterator import batch_generator, tqdm_open
 from .logging import SEPARATION_LINE, TqdmRedirector, logging_indent
-from .parsers import parse_args_as
+from .parsers import LookUpCall, parse_args_as

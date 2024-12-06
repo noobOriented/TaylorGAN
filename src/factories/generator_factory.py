@@ -3,12 +3,11 @@ from functools import partial
 
 import pydantic
 import torch
-from flexparse import LookUpCall
 from torch.nn import Embedding, GRUCell, Linear, Sequential
 
 from core.models import AutoRegressiveGenerator, Generator
 from core.preprocess.record_objects import MetaData
-from library.utils import NamedObject
+from library.utils import LookUpCall, NamedObject
 
 
 class GeneratorConfigs(pydantic.BaseModel):
@@ -30,8 +29,8 @@ class GeneratorConfigs(pydantic.BaseModel):
         else:
             presoftmax_layer.weight.data.copy_(embedder.weight)
 
-        cell_func = _G_MODELS(self.generator)
-        cell: torch.nn.Module = cell_func(embedder.embedding_dim)
+        cell_func, info = _G_MODELS(self.generator, return_info=True)
+        cell = cell_func(embedder.embedding_dim)
         return NamedObject(
             AutoRegressiveGenerator(
                 cell=cell,
@@ -42,7 +41,7 @@ class GeneratorConfigs(pydantic.BaseModel):
                 ),
                 special_token_config=metadata.special_token_config,
             ),
-            name=cell_func.argument_info.func_name,
+            name=info.func_name,
         )
 
 
@@ -50,10 +49,7 @@ def gru_cell(units: int = 1024):
     return partial(GRUCell, hidden_size=units)
 
 
-_G_MODELS = LookUpCall(
-    {
-        'gru': gru_cell,
-        'test': lambda: partial(GRUCell, hidden_size=10),
-    },
-    set_info=True,
-)
+_G_MODELS = LookUpCall({
+    'gru': gru_cell,
+    'test': lambda: partial(GRUCell, hidden_size=10),
+})

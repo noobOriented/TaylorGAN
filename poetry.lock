@@ -453,25 +453,6 @@ files = [
 flake8 = "*"
 
 [[package]]
-name = "flexparse"
-version = "0.1.0"
-description = "flexible argparse for scripts with many options"
-optional = false
-python-versions = "^3.6"
-files = []
-develop = false
-
-[package.dependencies]
-more-itertools = "*"
-termcolor = "*"
-
-[package.source]
-type = "git"
-url = "https://github.com/noobOriented/flexparse.git"
-reference = "main"
-resolved_reference = "0562dffe385fb4f93a5747cbad5ce140cbfa2fbb"
-
-[[package]]
 name = "fsspec"
 version = "2024.10.0"
 description = "File-system specification"
@@ -2112,4 +2093,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "45ce9d9a7756627279043903025c6aa2560c311546a9d6d08782ac1e83bac4d2"
+content-hash = "f44d1e79235d10b88b7b8e1a464a7bf2be4bebda96ed3d2c6291418a27991b24"

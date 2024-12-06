@@ -17,7 +17,6 @@ tensorflow-hub = "0.7.0"
 tqdm = "^4.40.0"
 u-msgpack-python = "*"
 pyyaml = "*"
-flexparse = { git = "https://github.com/noobOriented/flexparse.git", branch = "main" }
 torch = "^2.0.0"
 pydantic = "^2.10.2"
 

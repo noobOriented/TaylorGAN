@@ -5,7 +5,6 @@ import typing as t
 
 import pydantic
 import torch
-from flexparse import LookUpCall
 from torch.nn import Embedding, Linear
 
 from core.models import Discriminator, Generator
@@ -26,7 +25,7 @@ from library.torch_zoo.nn.masking import (
     MaskAvgPool1d, MaskConv1d, MaskGlobalAvgPool1d, MaskSequential,
 )
 from library.torch_zoo.nn.resnet import ResBlock
-from library.utils import ArgumentBinder, NamedObject
+from library.utils import ArgumentBinder, LookUpCall, NamedObject
 
 
 class MLEObjectiveConfigs(pydantic.BaseModel):
@@ -79,7 +78,7 @@ class GANObjectiveConfigs(pydantic.BaseModel):
 
     def _create_discriminator(self, metadata: MetaData) -> Discriminator:
         print(f"Create discriminator: {self.discriminator}")
-        network_func = _D_MODELS(self.discriminator)
+        network_func, arginfo = _D_MODELS(self.discriminator, return_info=True)
         embedder = Embedding.from_pretrained(
             torch.from_numpy(metadata.load_pretrained_embeddings()),
             freeze=self.d_fix_embeddings,
@@ -89,7 +88,7 @@ class GANObjectiveConfigs(pydantic.BaseModel):
                 network=network_func(embedder.embedding_dim),
                 embedder=embedder,
             ),
-            name=network_func.argument_info.func_name,
+            name=arginfo.func_name,
         )
 
     @functools.cached_property
@@ -146,31 +145,23 @@ _G_REGS = LookUpCall({
     'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
     'entropy': LossScaler.as_constructor(EntropyRegularizer),
 })
-_OPTIMIZERS = LookUpCall(
-    {
-        key: ArgumentBinder(
-            OptimizerWrapper.as_constructor(optim_cls),
-            preserved=['params'],
-        )
-        for key, optim_cls in [
-            ('sgd', torch.optim.SGD),
-            ('rmsprop', torch.optim.RMSprop),
-            ('adam', torch.optim.Adam),
-        ]
-    },
-)
+_OPTIMIZERS = LookUpCall({
+    key: ArgumentBinder(OptimizerWrapper.as_constructor(optim_cls), preserved=['params'])
+    for key, optim_cls in [
+        ('sgd', torch.optim.SGD),
+        ('rmsprop', torch.optim.RMSprop),
+        ('adam', torch.optim.Adam),
+    ]
+})
 
-_D_MODELS = LookUpCall(
-    {
-        key: ArgumentBinder(func, preserved=['input_size'])
-        for key, func in [
-            ('cnn', cnn),
-            ('resnet', resnet),
-            ('test', lambda input_size: MaskGlobalAvgPool1d(dim=1)),
-        ]
-    },
-    set_info=True,
-)
+_D_MODELS = LookUpCall({
+    key: ArgumentBinder(func, preserved=['input_size'])
+    for key, func in [
+        ('cnn', cnn),
+        ('resnet', resnet),
+        ('test', lambda input_size: MaskGlobalAvgPool1d(dim=1)),
+    ]
+})
 _ESTIMATORS = LookUpCall({
     'reinforce': ReinforceEstimator,
     'st': StraightThroughEstimator,

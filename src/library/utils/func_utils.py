@@ -1,4 +1,5 @@
 import inspect
+import typing as t
 from functools import WRAPPER_ASSIGNMENTS, WRAPPER_UPDATES, update_wrapper
 from itertools import chain
 
@@ -12,9 +13,9 @@ class ObjectWrapper:
         return getattr(self._wrapped, name)
 
 
-class ArgumentBinder:
+class ArgumentBinder[T]:
 
-    def __init__(self, func, preserved=()):
+    def __init__(self, func: t.Callable[..., T], preserved=()):
         old_sig = inspect.signature(func)
         preserved = set(preserved)
         self.func = func
@@ -26,7 +27,7 @@ class ArgumentBinder:
             ],
         )
 
-    def __call__(self, *b_args, **b_kwargs):
+    def __call__(self, *b_args, **b_kwargs) -> t.Callable[..., T]:
         binding = self.__signature__.bind_partial(*b_args, **b_kwargs)
 
         def bound_function(*args, **kwargs):
