@@ -59,7 +59,7 @@ class TextGenerator:
             ),
             'seq_neg_logprobs': torch.zeros([1, self._tokenizer.maxlen], dtype=torch.int64),
         }
-        return torch.jit.trace_module(self.generator._wrapped, inputs)
+        return torch.jit.trace_module(self.generator, inputs)
 
     def ids_to_text(self, word_ids):
         return self._tokenizer.ids_to_text(word_ids)

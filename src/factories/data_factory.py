@@ -6,7 +6,7 @@ import yaml
 from dotenv import load_dotenv
 
 from core.preprocess import CorpusConfig, LanguageConfig, MetaData, TextDataset, UttutPreprocessor
-from library.utils import NamedDict, format_id
+from library.utils import format_id
 
 
 load_dotenv('.env')
@@ -40,27 +40,19 @@ class DataConfigs(pydantic.BaseModel):
 
 
 def _load_corpus_table(path):
-    corpus_table = NamedDict()
+    corpus_table = {}
     with open(path) as f:
         for data_id, corpus_dict in yaml.load(f, Loader=yaml.FullLoader).items():
-            config = _parse_config(corpus_dict)
+            language_id = corpus_dict['language']
+            config = CorpusConfig(
+                data_id,
+                path=path,
+                language_config=LANGUAGE_CONFIGS[language_id],
+                maxlen=corpus_dict.get('maxlen'),
+                vocab_size=corpus_dict.get('vocab_size'),
+            )
             if 'train' in config.path and all(os.path.isfile(p) for p in config.path.values()):
                 # TODO else warning?
                 corpus_table[data_id] = config
 
     return corpus_table
-
-
-def _parse_config(corpus_dict) -> CorpusConfig:
-    if isinstance(corpus_dict['path'], dict):
-        path = corpus_dict['path']
-    else:
-        path = {'train': corpus_dict['path']}
-
-    language_id = corpus_dict['language']
-    return CorpusConfig(
-        path=path,
-        language_config=LANGUAGE_CONFIGS[language_id],
-        maxlen=corpus_dict.get('maxlen'),
-        vocab_size=corpus_dict.get('vocab_size'),
-    )

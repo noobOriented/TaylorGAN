@@ -1,3 +1,5 @@
+import typing as t
+
 import torch
 
 from core.models.discriminators import Discriminator
@@ -15,11 +17,11 @@ class ReinforceEstimator(GANEstimator):
         self.baseline = None
 
     def compute_loss(
-            self,
-            fake_samples: SampledTokenSequence,
-            discriminator: Discriminator,
-            generator_loss: callable,
-        ):
+        self,
+        fake_samples: SampledTokenSequence,
+        discriminator: Discriminator,
+        generator_loss: t.Callable,
+    ):
         score = discriminator.score_samples(fake_samples)
         adv_loss = generator_loss(score)
         reward = adv_loss.squeeze(axis=1)  # shape (N, )
@@ -47,11 +49,11 @@ class TaylorEstimator(GANEstimator):
         self.baseline = None
 
     def compute_loss(
-            self,
-            fake_samples: SampledTokenSequence,
-            discriminator: Discriminator,
-            generator_loss: callable,
-        ):
+        self,
+        fake_samples: SampledTokenSequence,
+        discriminator: Discriminator,
+        generator_loss,
+    ):
         fake_embeddings = discriminator.get_embedding(word_ids=fake_samples.ids)
         score = discriminator.score_word_vector(fake_embeddings, mask=fake_samples.mask)
         adv_loss = generator_loss(score)
@@ -107,11 +109,11 @@ class TaylorEstimator(GANEstimator):
 class StraightThroughEstimator(GANEstimator):
 
     def compute_loss(
-            self,
-            fake_samples: SampledTokenSequence,
-            discriminator: Discriminator,
-            generator_loss: callable,
-        ):
+        self,
+        fake_samples: SampledTokenSequence,
+        discriminator: Discriminator,
+        generator_loss: t.Callable,
+    ):
         word_vecs = discriminator.get_embedding(word_ids=fake_samples.ids)
         score = discriminator.score_word_vector(word_vecs)
         adv_loss = generator_loss(score)

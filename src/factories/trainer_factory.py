@@ -25,7 +25,7 @@ from library.torch_zoo.nn.masking import (
     MaskAvgPool1d, MaskConv1d, MaskGlobalAvgPool1d, MaskSequential,
 )
 from library.torch_zoo.nn.resnet import ResBlock
-from library.utils import ArgumentBinder, LookUpCall, NamedObject
+from library.utils import ArgumentBinder, LookUpCall
 
 
 class MLEObjectiveConfigs(pydantic.BaseModel):
@@ -83,12 +83,9 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             torch.from_numpy(metadata.load_pretrained_embeddings()),
             freeze=self.d_fix_embeddings,
         )
-        return NamedObject(
-            Discriminator(
-                network=network_func(embedder.embedding_dim),
-                embedder=embedder,
-            ),
-            name=arginfo.func_name,
+        return Discriminator(
+            network=network_func(embedder.embedding_dim),
+            embedder=embedder,
         )
 
     @functools.cached_property

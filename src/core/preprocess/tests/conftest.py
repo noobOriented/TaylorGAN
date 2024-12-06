@@ -1,7 +1,6 @@
 import pytest
 
 from ..config_objects import CorpusConfig, LanguageConfig
-from library.utils import NamedObject
 
 
 @pytest.fixture(scope='session')
@@ -25,11 +24,9 @@ def language_config(data_dir):
 
 @pytest.fixture(scope='session')
 def corpus_config(data_dir, language_config):
-    return NamedObject(
-        CorpusConfig(
-            path=data_dir / 'train.txt',
-            maxlen=10,
-            language_config=language_config,
-        ),
-        name='test',
+    return CorpusConfig(
+        'test',
+        path=data_dir / 'train.txt',
+        maxlen=10,
+        language_config=language_config,
     )

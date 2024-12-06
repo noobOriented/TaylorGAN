@@ -67,7 +67,7 @@ class GANTrainer(Trainer):
             )
             self.discriminator_updater.update_step(
                 real_samples=real_samples,
-                fake_samples=self.generator_updater.generator.generate(*batch_data.shape),
+                fake_samples=self.generator_updater.module.generate(*batch_data.shape),
             )
             if self.discriminator_updater.step % self.d_steps == 0:
                 self.generator_updater.update_step(real_samples)

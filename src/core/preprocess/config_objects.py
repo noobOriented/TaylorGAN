@@ -47,6 +47,7 @@ class CorpusConfig:
 
     def __init__(
         self,
+        name: str,
         path: str | t.Mapping[str, str],
         language_config: LanguageConfig,
         maxlen: int | None = None,  # used when preprocessor.maxlen = None
@@ -54,6 +55,8 @@ class CorpusConfig:
     ):
         if not isinstance(path, t.Mapping):
             path = {'train': path}
+        
+        self.name = name
         self.path = path
         self.language_config = language_config
         self.maxlen = maxlen
