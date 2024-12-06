@@ -1,25 +1,38 @@
+import argparse
 import os
 import pathlib
 
 import pydantic
-import argparse
 
 from configs import GANTrainingConfigs, MLETrainingConfigs
 from core.train.callbacks import ModelCheckpoint
-from scripts.parsers import save_parser
 
 from . import train
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        parents=[save_parser(argument_default=argparse.SUPPRESS)],
-        argument_default=argparse.SUPPRESS,
-    )
+    parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
     parser.add_argument(
         'path',
         type=pathlib.Path,
         help="load checkpoint from this file prefix.",
+    )
+    # TODO pydantic Model?
+    parser.add_argument(
+        '--checkpoint-root', '--ckpt',
+        type=pathlib.Path,
+        help="save checkpoint to this directory.",
+    )
+    parser.add_argument(
+        '--serving-root',
+        type=pathlib.Path,
+        help='save serving model to this directory.',
+    )
+    parser.add_argument(
+        '--save-period',
+        type=int,  # IntRange(minval=1),
+        default=1,
+        help="interval (number of epochs) between each saving.",
     )
     parser.add_argument(
         '--epochs',
@@ -27,6 +40,7 @@ def main():
         help="number of training epochs. (default: same as original args.)",
     )
     args = parser.parse_args()
+
     restore_path = args.path
     main_args_path = restore_path / 'args'
     try:

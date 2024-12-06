@@ -4,8 +4,6 @@ import pathlib
 from core.evaluate import TextGenerator
 from core.preprocess import Tokenizer
 
-from .parsers import parse_args_as
-
 
 def main():
     parser = argparse.ArgumentParser()

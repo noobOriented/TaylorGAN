@@ -1,6 +1,4 @@
 import argparse
-import os
-import pathlib
 import typing as t
 
 import pydantic
@@ -38,28 +36,3 @@ def parse_args_as[T: pydantic.BaseModel](typ: type[T], *, args: t.Sequence[str] 
 
 def lenient_issubclass(cls, base: tuple[type] | type) -> bool:
     return isinstance(cls, type) and issubclass(cls, base)
-
-
-def save_parser(**kwargs):
-    parser = argparse.ArgumentParser(add_help=False, **kwargs)
-    group = parser.add_argument_group('save', description="Settings of saving model.")
-    group.add_argument(
-        '--checkpoint-root', '--ckpt',
-        type=pathlib.Path,
-        help="save checkpoint to this directory.",
-    )
-    if group.get_default('checkpoint_root') is None:  # to avoid interfering SUPPRESS
-        group.set_defaults(checkpoint_root=os.getenv('CHECKPOINT_DIR'))
-
-    group.add_argument(
-        '--serving-root',
-        type=pathlib.Path,
-        help='save serving model to this directory.',
-    )
-    group.add_argument(
-        '--save-period',
-        type=int,  # IntRange(minval=1),
-        default=1,
-        help="interval (number of epochs) between each saving.",
-    )
-    return parser

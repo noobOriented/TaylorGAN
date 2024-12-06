@@ -2,8 +2,7 @@ from configs import GANTrainingConfigs, MLETrainingConfigs
 from core.train import DataLoader
 from core.train.callbacks import ModelCheckpoint
 from factories import callback_factory
-from library.utils import logging_indent
-from scripts.parsers import parse_args_as
+from library.utils import logging_indent, parse_args_as
 from scripts.snippets import set_global_random_seed
 
 

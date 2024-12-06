@@ -5,8 +5,7 @@ import typing as t
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
 from core.preprocess.record_objects import TextDataset
 from factories import data_factory
-from library.utils import random_sample
-from .parsers import parse_args_as
+from library.utils import parse_args_as, random_sample
 
 
 # HUB_URL = "https://tfhub.dev/google/universal-sentence-encoder-large/3"

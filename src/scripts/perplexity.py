@@ -5,8 +5,7 @@ import pydantic
 
 from core.evaluate import TextGenerator
 from factories import data_factory
-
-from .parsers import parse_args_as
+from library.utils import parse_args_as
 
 
 def main():
