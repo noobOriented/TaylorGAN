@@ -4,12 +4,9 @@ import typing as t
 import pydantic
 import yaml
 from dotenv import load_dotenv
-from flexparse import SUPPRESS, ArgumentParser, IntRange, create_action
 
-from core.preprocess import UttutPreprocessor
-from core.preprocess.config_objects import CorpusConfig, LanguageConfig
-from core.preprocess.record_objects import MetaData, TextDataset
-from library.utils import NamedDict, format_id, format_path
+from core.preprocess import CorpusConfig, LanguageConfig, MetaData, TextDataset, UttutPreprocessor
+from library.utils import NamedDict, format_id
 
 
 load_dotenv('.env')
@@ -35,16 +32,14 @@ class DataConfigs(pydantic.BaseModel):
         pydantic.Field(ge=1, description='the maximum number of tokens. ordered by descending frequency.'),
     ] = None
 
-
-def preprocess(args: DataConfigs) -> tuple[dict[str, TextDataset], MetaData]:
-    print(f"data_id: {format_id(args.dataset)}")
-    print(f"preprocessor_id {format_id('uttut')}")
-    preprocessor = UttutPreprocessor(maxlen=args.maxlen, vocab_size=args.vocab_size)
-    corpus_config = load_corpus_table(CONFIG_PATH)[args.dataset]
-    return preprocessor.preprocess(corpus_config, return_meta=True)
+    def load_data(self) -> tuple[dict[str, TextDataset], MetaData]:
+        print(f"data_id: {format_id(self.dataset)}")
+        preprocessor = UttutPreprocessor(self.maxlen, self.vocab_size)
+        corpus_config = _load_corpus_table(CONFIG_PATH)[self.dataset]
+        return preprocessor.preprocess(corpus_config, return_meta=True)
 
 
-def load_corpus_table(path):
+def _load_corpus_table(path):
     corpus_table = NamedDict()
     with open(path) as f:
         for data_id, corpus_dict in yaml.load(f, Loader=yaml.FullLoader).items():
@@ -56,7 +51,7 @@ def load_corpus_table(path):
     return corpus_table
 
 
-def _parse_config(corpus_dict):
+def _parse_config(corpus_dict) -> CorpusConfig:
     if isinstance(corpus_dict['path'], dict):
         path = corpus_dict['path']
     else:
@@ -69,32 +64,3 @@ def _parse_config(corpus_dict):
         maxlen=corpus_dict.get('maxlen'),
         vocab_size=corpus_dict.get('vocab_size'),
     )
-
-
-ARGS = [
-    create_action(
-        '--dataset',
-        required=True,
-        default=SUPPRESS,
-        help='the choice of corpus.',
-    ),
-    create_action(
-        '--maxlen',
-        type=IntRange(minval=1),
-        help="the max length of sequence padding. "
-             f"(use the value declared in {format_path(CONFIG_PATH)} if not given)",
-    ),
-    create_action(
-        '--vocab-size',
-        type=IntRange(minval=1),
-        help="the maximum number of tokens. ordered by descending frequency. "
-             f"(use the value declared in {format_path(CONFIG_PATH)} if not given)",
-    ),
-]
-
-PARSER = ArgumentParser(add_help=False)
-PARSER.add_argument_group(
-    'data',
-    description="data corpus and preprocessing configurations.",
-    actions=ARGS,
-)

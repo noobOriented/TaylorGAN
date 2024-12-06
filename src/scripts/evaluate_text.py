@@ -1,12 +1,12 @@
-import argparse
 import os
+import pathlib
 import typing as t
 
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
 from core.preprocess.record_objects import TextDataset
 from factories import data_factory
 from library.utils import random_sample
-from scripts.parsers import evaluate_parser
+from .parsers import parse_args_as
 
 
 # HUB_URL = "https://tfhub.dev/google/universal-sentence-encoder-large/3"
@@ -15,28 +15,30 @@ RLM_EPOCHS = 100
 
 
 def main():
-    parser = argparse.ArgumentParser(parents=[data_factory.PARSER, evaluate_parser()])
-    parser.add_argument('--eval-path', required=True)
-    args = parser.parse_args()
+    class Args(data_factory.DataConfigs):
+        eval_path: pathlib.Path
+        bleu: int | None = None
+        fed: int | None = None
 
-    data_collection, meta_data = data_factory.preprocess(args)
-    tokenizer = meta_data.tokenizer
+    args = parse_args_as(Args)
+    data_collection, metadata = args.load_data()
+    tokenizer = metadata.tokenizer
 
     metric_calcuators = []
-    if args.fed:
-        metric_calcuators.append(FEDMetrics(data_collection, tokenizer, sample_size=args.fed))
     if args.bleu:
         metric_calcuators.append(
             BLEUMetrics(
                 data_collection,
                 max_gram=args.bleu,
                 eos_idx=tokenizer.eos_idx,
-                cache_dir=meta_data.cache_dir,
+                cache_dir=metadata.cache_dir,
             ),
         )
+    if args.fed:
+        metric_calcuators.append(FEDMetrics(data_collection, tokenizer, sample_size=args.fed))
 
-    with open(args.eval_path, 'r') as f_in:
-        texts = [line.rstrip() for line in f_in.readlines()]
+    with open(args.eval_path, 'r') as f:
+        texts = [line.rstrip() for line in f.readlines()]
         tokens = tokenizer.texts_to_array(texts)
 
     metrics = {}

@@ -3,11 +3,18 @@ import pathlib
 
 from core.evaluate import TextGenerator
 from core.preprocess import Tokenizer
-from scripts.parsers import load_parser
+
+from .parsers import parse_args_as
 
 
 def main():
-    parser = argparse.ArgumentParser(parents=[load_parser()])
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--model-path',
+        type=pathlib.Path,
+        required=True,
+        help='path of serving model folder.',
+    )
     parser.add_argument(
         '--export-path',
         type=pathlib.Path,

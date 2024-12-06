@@ -1,14 +1,21 @@
-import argparse
+import pathlib
+import typing as t
+
+import pydantic
 
 from core.evaluate import TextGenerator
 from factories import data_factory
-from scripts.parsers import load_parser
+
+from .parsers import parse_args_as
 
 
 def main():
-    parser = argparse.ArgumentParser(parents=[data_factory.PARSER, load_parser()])
-    args = parser.parse_args()
-    data_collection, meta = data_factory.preprocess(args)
+
+    class Args(data_factory.DataConfigs):
+        model_path: t.Annotated[pathlib.Path, pydantic.Field(description='path of serving model folder.')]
+
+    args = parse_args_as(Args)
+    data_collection, meta = args.load_data()
     generator = TextGenerator.load_traced(args.model_path, tokenizer=meta.tokenizer)
     for tag, dataset in data_collection.items():
         print(f"Evaluate {tag} perplexity:")
