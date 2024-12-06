@@ -3,7 +3,7 @@ import pathlib
 import typing as t
 
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
-from core.preprocess.record_objects import TextDataset
+from core.preprocess import TextDataset
 from factories import data_factory
 from library.utils import parse_args_as, random_sample
 

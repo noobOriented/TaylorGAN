@@ -7,16 +7,12 @@ import more_itertools
 
 from library.utils import JSONSerializableMixin, format_path, logging_indent, tqdm_open
 
-from .adaptors import WordEmbeddingCollection
+from ._adaptors import WordEmbeddingCollection
 
 
 class LanguageConfig(JSONSerializableMixin):
 
-    def __init__(
-        self,
-        embedding_path: str | None,
-        split_token: str = '',
-    ):
+    def __init__(self, embedding_path: str | None, split_token: str = ''):
         self.embedding_path = embedding_path
         self.split_token = split_token
 
@@ -26,7 +22,7 @@ class LanguageConfig(JSONSerializableMixin):
         text = text.lower()
         return _tokenize(text)
 
-    def load_pretrained_embeddings_msg(self):
+    def load_pretrained_embeddings_msg(self) -> WordEmbeddingCollection:
         if not (self.embedding_path and os.path.isfile(self.embedding_path)):
             raise FileNotFoundError(f"invalid embedding_path: {self.embedding_path}")
         print(f"Load pretrained embedding from : {format_path(self.embedding_path)}")
@@ -55,7 +51,7 @@ class CorpusConfig:
     ):
         if not isinstance(path, t.Mapping):
             path = {'train': path}
-        
+
         self.name = name
         self.path = path
         self.language_config = language_config

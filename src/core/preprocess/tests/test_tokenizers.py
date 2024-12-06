@@ -1,6 +1,6 @@
 import pytest
 
-from ..tokenizers import Tokenizer
+from .. import Tokenizer
 
 
 class TestTokenizer:

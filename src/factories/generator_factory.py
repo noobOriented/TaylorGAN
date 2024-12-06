@@ -6,7 +6,7 @@ import torch
 from torch.nn import Embedding, GRUCell, Linear, Sequential
 
 from core.models import AutoRegressiveGenerator, Generator
-from core.preprocess.record_objects import MetaData
+from core.preprocess import MetaData
 from library.utils import LookUpCall
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-from ..config_objects import CorpusConfig, LanguageConfig
+from .. import CorpusConfig, LanguageConfig
 
 
 @pytest.fixture(scope='session')

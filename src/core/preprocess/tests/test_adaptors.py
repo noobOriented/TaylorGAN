@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..adaptors import WordEmbeddingCollection
+from .._adaptors import WordEmbeddingCollection
 
 
 class TestWordEmbeddingCollection:

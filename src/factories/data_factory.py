@@ -5,7 +5,7 @@ import pydantic
 import yaml
 from dotenv import load_dotenv
 
-from core.preprocess import CorpusConfig, LanguageConfig, MetaData, TextDataset, UttutPreprocessor
+from core.preprocess import CorpusConfig, LanguageConfig, MetaData, TextDataset, Preprocessor
 from library.utils import format_id
 
 
@@ -34,19 +34,19 @@ class DataConfigs(pydantic.BaseModel):
 
     def load_data(self) -> tuple[dict[str, TextDataset], MetaData]:
         print(f"data_id: {format_id(self.dataset)}")
-        preprocessor = UttutPreprocessor(self.maxlen, self.vocab_size)
+        preprocessor = Preprocessor(self.maxlen, self.vocab_size)
         corpus_config = _load_corpus_table(CONFIG_PATH)[self.dataset]
         return preprocessor.preprocess(corpus_config, return_meta=True)
 
 
 def _load_corpus_table(path):
-    corpus_table = {}
+    corpus_table: dict[str, CorpusConfig] = {}
     with open(path) as f:
         for data_id, corpus_dict in yaml.load(f, Loader=yaml.FullLoader).items():
             language_id = corpus_dict['language']
             config = CorpusConfig(
                 data_id,
-                path=path,
+                path=corpus_dict['path'],
                 language_config=LANGUAGE_CONFIGS[language_id],
                 maxlen=corpus_dict.get('maxlen'),
                 vocab_size=corpus_dict.get('vocab_size'),
