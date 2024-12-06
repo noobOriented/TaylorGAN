@@ -19,32 +19,31 @@ class GeneratorConfigs(pydantic.BaseModel):
     ] = False
     g_fix_embeddings: bool = False
 
+    def create_generator(self, metadata: MetaData) -> Generator:
+        print(f"Create generator: {self.generator}")
 
-def create(args: GeneratorConfigs, metadata: MetaData) -> Generator:
-    print(f"Create generator: {args.generator}")
+        embedding_matrix = torch.from_numpy(metadata.load_pretrained_embeddings())
+        embedder = Embedding.from_pretrained(embedding_matrix, freeze=self.g_fix_embeddings)
+        presoftmax_layer = Linear(embedder.embedding_dim, embedder.num_embeddings)
+        if self.tie_embeddings:
+            presoftmax_layer.weight = embedder.weight
+        else:
+            presoftmax_layer.weight.data.copy_(embedder.weight)
 
-    embedding_matrix = torch.from_numpy(metadata.load_pretrained_embeddings())
-    embedder = Embedding.from_pretrained(embedding_matrix, freeze=args.g_fix_embeddings)
-    presoftmax_layer = Linear(embedder.embedding_dim, embedder.num_embeddings)
-    if args.tie_embeddings:
-        presoftmax_layer.weight = embedder.weight
-    else:
-        presoftmax_layer.weight.data.copy_(embedder.weight)
-
-    cell_func = _G_MODELS(args.generator)
-    cell: torch.nn.Module = cell_func(embedder.embedding_dim)
-    return NamedObject(
-        AutoRegressiveGenerator(
-            cell=cell,
-            embedder=embedder,
-            output_layer=Sequential(
-                Linear(cell.hidden_size, embedder.embedding_dim, bias=False),
-                presoftmax_layer,
+        cell_func = _G_MODELS(self.generator)
+        cell: torch.nn.Module = cell_func(embedder.embedding_dim)
+        return NamedObject(
+            AutoRegressiveGenerator(
+                cell=cell,
+                embedder=embedder,
+                output_layer=Sequential(
+                    Linear(cell.hidden_size, embedder.embedding_dim, bias=False),
+                    presoftmax_layer,
+                ),
+                special_token_config=metadata.special_token_config,
             ),
-            special_token_config=metadata.special_token_config,
-        ),
-        name=cell_func.argument_info.func_name,
-    )
+            name=cell_func.argument_info.func_name,
+        )
 
 
 def gru_cell(units: int = 1024):

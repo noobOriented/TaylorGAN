@@ -30,10 +30,10 @@ def main(args: GANTrainingConfigs | MLETrainingConfigs, base_tag=None, checkpoin
         metadata.tokenizer.summary()
 
     with logging_indent("Prepare Generator"):
-        generator = generator_factory.create(args, metadata)
+        generator = args.create_generator(metadata)
 
     with logging_indent("Prepare Generator Trainer"):
-        trainer = trainer_factory.create(args, metadata, generator)
+        trainer = args.create_trainer(metadata, generator)
         trainer.summary()
 
     with logging_indent("Prepare Callback"):
