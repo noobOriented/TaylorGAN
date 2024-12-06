@@ -19,7 +19,7 @@ class GeneratorConfigs(pydantic.BaseModel):
     ] = False
     g_fix_embeddings: bool = False
 
-    def create_generator(self, metadata: MetaData) -> Generator:
+    def get_generator(self, metadata: MetaData) -> Generator:
         print(f"Create generator: {self.generator}")
 
         embedding_matrix = torch.from_numpy(metadata.load_pretrained_embeddings())

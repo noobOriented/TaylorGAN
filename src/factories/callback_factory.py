@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import functools
+import pathlib
 import time
 import typing as t
 import warnings
-from pathlib import Path
 
 import numpy as np
 from termcolor import colored
@@ -20,7 +22,7 @@ from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_s
 
 
 def create(
-    args,
+    args: _Args,
     trainer: Trainer,
     generator: Generator,
     data_collection: t.Mapping[str, TextDataset],
@@ -52,10 +54,32 @@ def create(
             checkpoint_root=args.checkpoint_root,
             period=args.save_period,
         ),
-        *creator.create_profiler(export_path=args.profile),
+        *creator.create_profiler(args.profile),
     ])
     callback_list.summary()
     return callback_list
+
+
+class _Args(t.Protocol):
+    dataset: str
+    batch_size: int
+
+    # Evaluate
+    bleu: int | None
+    fed: int | None
+
+    # Save
+    checkpoint_root: pathlib.Path | None
+    serving_root: pathlib.Path | None
+    save_period: int
+
+    # Logging
+    tensorboard: pathlib.Path | None
+    tags: list[str]
+
+    # Dev
+    profile: pathlib.Path | None
+
 
 
 class _CallbackCreator:
@@ -64,18 +88,18 @@ class _CallbackCreator:
         self.generator = generator
         self.data_collection = data_collection
         self.metadata = metadata
-        self.tag = Path(*tags)
+        self.tag = pathlib.Path(*tags)
 
-    def create_evaluator(self, bleu_n_gram: int, sample_size: int, fed_sample_size: int):
+    def create_evaluator(self, bleu_n_gram: int | None, sample_size: int, fed_sample_size: int | None):
         return EvaluatorCreator(
             text_generator=self.text_generator,
             data_collection=self.data_collection,
             metadata=self.metadata,
         ).create(bleu_n_gram, sample_size, fed_sample_size)
 
-    def create_loggers(self, updaters, tensorboard_logdir: Path):
+    def create_loggers(self, updaters, tensorboard_logdir: pathlib.Path | None):
         yield ProgbarLogger(
-            desc=self.tag,
+            desc=str(self.tag),
             total=len(self.data_collection['train']),
             updaters=updaters,
         )
@@ -86,7 +110,14 @@ class _CallbackCreator:
                 log_period=10,
             )
 
-    def create_savers(self, args, trainer, serving_root: Path, checkpoint_root: Path, period: int):
+    def create_savers(
+        self,
+        args,
+        trainer,
+        serving_root: pathlib.Path | None,
+        checkpoint_root: pathlib.Path | None,
+        period: int,
+    ):
         if serving_root:
             serving_dir = serving_root / self.tag
             serving_dir.mkdir(exist_ok=True)
@@ -107,7 +138,7 @@ class _CallbackCreator:
         else:
             warnings.warn("`checkpoint_root` is not given. Training can't be restored!")
 
-    def create_profiler(self, export_path: Path):
+    def create_profiler(self, export_path: pathlib.Path | None):
         if export_path:
             yield TrainProfiler(
                 warm_up=100,
@@ -128,7 +159,7 @@ class EvaluatorCreator:
         self.data_collection = data_collection
         self.metadata = metadata
 
-    def create(self, bleu_n_gram, sample_size, fed_sample_size):
+    def create(self, bleu_n_gram: int | None, sample_size: int, fed_sample_size: int | None):
         evaluator = TextEvaluator(self.text_generator)
         self._attach_basic(sample_size, evaluator)
         if bleu_n_gram is not None:

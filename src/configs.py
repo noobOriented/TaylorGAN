@@ -6,23 +6,19 @@ import typing as t
 import pydantic
 
 from factories.data_factory import DataConfigs
-from factories.modules.generator import GeneratorConfigs
+from factories.generator_factory import GeneratorConfigs
 from factories.trainer_factory import GANObjectiveConfigs, MLEObjectiveConfigs
 
 
-class _BaseModelExtraForbid(pydantic.BaseModel, extra='forbid'):
-    pass
-
-
-class TrainConfigs(_BaseModelExtraForbid):
+class _CommonTrainingConfigs(DataConfigs, GeneratorConfigs):
+    # Training
     epochs: t.Annotated[int, pydantic.Field(ge=1, description='number of training epochs.')] = 10_000
     batch_size: t.Annotated[int, pydantic.Field(ge=1, description='size of data mini-batch.')] = 64
     random_seed: t.Annotated[int | None, pydantic.Field(description='the global random seed.')] = None
 
-
-class EvaluateConfigs(_BaseModelExtraForbid):
+    # Evaluate
     bleu: t.Annotated[
-        int,
+        int | None,
         pydantic.Field(ge=1, le=5, description='longest n-gram to calculate BLEU/SelfBLEU score.'),
     ] = 5
     fed: t.Annotated[
@@ -30,14 +26,12 @@ class EvaluateConfigs(_BaseModelExtraForbid):
         pydantic.Field(description='number of sample size for FED score.'),
     ] = None
 
-
-class SaveConfigs(_BaseModelExtraForbid):
+    # Save
     checkpoint_root: pathlib.Path | None = None
     serving_root: pathlib.Path | None = None
     save_period: pydantic.PositiveInt = 1
 
-
-class LoggingConfigs(_BaseModelExtraForbid):
+    # Logging
     tensorboard: t.Annotated[
         pathlib.Path | None,
         pydantic.Field(description='whether to log experiment on tensorboard.')
@@ -47,14 +41,13 @@ class LoggingConfigs(_BaseModelExtraForbid):
         pydantic.Field(description='additional tags to configure this training (will be used in tensorboard).'),
     ] = []
 
-
-class _CommonTrainingConfigs(DataConfigs, TrainConfigs, EvaluateConfigs, SaveConfigs, LoggingConfigs):
+    # Dev
     profile: pathlib.Path | None = None
 
 
-class MLETrainingConfigs(_CommonTrainingConfigs, GeneratorConfigs, MLEObjectiveConfigs):
+class MLETrainingConfigs(_CommonTrainingConfigs, MLEObjectiveConfigs, extra='forbid'):
     pass
 
 
-class GANTrainingConfigs(_CommonTrainingConfigs, GeneratorConfigs, GANObjectiveConfigs):
+class GANTrainingConfigs(_CommonTrainingConfigs, GANObjectiveConfigs, extra='forbid'):
     pass

@@ -6,8 +6,9 @@ import typing as t
 import pydantic
 import torch
 from flexparse import LookUpCall
+from torch.nn import Embedding, Linear
 
-from core.models import Generator
+from core.models import Discriminator, Generator
 from core.objectives import MLEObjective
 from core.objectives.GAN import (
     BCE, GANLossTuple, GANObjective, GumbelSoftmaxEstimator,
@@ -17,20 +18,22 @@ from core.objectives.regularizers import (
     EmbeddingRegularizer, EntropyRegularizer, GradientPenaltyRegularizer,
     LossScaler, SpectralRegularizer, WordVectorRegularizer,
 )
-from core.preprocess.record_objects import MetaData
-from core.train import (
-    DiscriminatorUpdater, GANTrainer, GeneratorUpdater, NonParametrizedTrainer, Trainer,
-)
+from core.preprocess import MetaData
+from core.train import DiscriminatorUpdater, GANTrainer, GeneratorUpdater, NonParametrizedTrainer
 from core.train.optimizer import OptimizerWrapper
-from factories.modules import discriminator_factory
-from library.utils import ArgumentBinder
+from library.torch_zoo.nn import LambdaModule, activations
+from library.torch_zoo.nn.masking import (
+    MaskAvgPool1d, MaskConv1d, MaskGlobalAvgPool1d, MaskSequential,
+)
+from library.torch_zoo.nn.resnet import ResBlock
+from library.utils import ArgumentBinder, NamedObject
 
 
 class MLEObjectiveConfigs(pydantic.BaseModel):
     g_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
     g_regularizers: list[str] = []
 
-    def create_trainer(self, metadata: MetaData, generator: Generator):
+    def get_trainer(self, metadata: MetaData, generator: Generator):
         generator_updater = GeneratorUpdater(
             generator,
             optimizer=_OPTIMIZERS(self.g_optimizer)(generator.trainable_variables),
@@ -52,13 +55,12 @@ class GANObjectiveConfigs(pydantic.BaseModel):
     loss: t.Annotated[str, pydantic.Field(description='loss function pair of GAN.')] = 'RKL'
     estimator: t.Annotated[str, pydantic.Field(description='gradient estimator for discrete sampling.')] = 'taylor'
 
-    def create_trainer(self, metadata: MetaData, generator: Generator):
-        discriminator = discriminator_factory.create(self, metadata)
-        estimator = _ESTIMATORS(self.estimator)
+    def get_trainer(self, metadata: MetaData, generator: Generator):
+        discriminator = self._create_discriminator(metadata)
         objective = GANObjective(
             discriminator=discriminator,
             generator_loss=self._loss_tuple.generator_loss,
-            estimator=estimator,
+            estimator=_ESTIMATORS(self.estimator),
         )
         generator_updater = GeneratorUpdater(
             generator,
@@ -75,6 +77,21 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             d_steps=self.d_steps,
         )
 
+    def _create_discriminator(self, metadata: MetaData) -> Discriminator:
+        print(f"Create discriminator: {self.discriminator}")
+        network_func = _D_MODELS(self.discriminator)
+        embedder = Embedding.from_pretrained(
+            torch.from_numpy(metadata.load_pretrained_embeddings()),
+            freeze=self.d_fix_embeddings,
+        )
+        return NamedObject(
+            Discriminator(
+                network=network_func(embedder.embedding_dim),
+                embedder=embedder,
+            ),
+            name=network_func.argument_info.func_name,
+        )
+
     @functools.cached_property
     def _loss_tuple(self) -> GANLossTuple:
         return {
@@ -84,6 +101,44 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             'RKL': GANLossTuple(lambda fake_score: -fake_score),  # log((1 - sig) / sig)
         }[self.loss]
 
+
+def cnn(input_size, activation: activations.TYPE_HINT = 'relu'):
+    ActivationLayer = activations.deserialize(activation)
+    return MaskSequential(
+        LambdaModule(lambda x: torch.transpose(x, 1, 2)),
+        MaskConv1d(input_size, 512, kernel_size=3, padding=1),
+        ActivationLayer(),
+        MaskConv1d(512, 512, kernel_size=3, padding=1),
+        ActivationLayer(),
+        MaskAvgPool1d(kernel_size=2),
+        MaskConv1d(512, 1024, kernel_size=3, padding=1),
+        ActivationLayer(),
+        MaskConv1d(1024, 1024, kernel_size=3, padding=1),
+        ActivationLayer(),
+        MaskGlobalAvgPool1d(),
+        Linear(1024, 1024),
+        ActivationLayer(),
+    )
+
+
+def resnet(input_size, activation: activations.TYPE_HINT = 'relu'):
+    ActivationLayer = activations.deserialize(activation)
+    return MaskSequential(
+        Linear(input_size, 512),
+        ActivationLayer(),
+        LambdaModule(lambda x: torch.transpose(x, 1, 2)),
+        ResBlock(512, kernel_size=3),
+        ActivationLayer(),
+        ResBlock(512, kernel_size=3),
+        ActivationLayer(),
+        ResBlock(512, kernel_size=3),
+        ActivationLayer(),
+        ResBlock(512, kernel_size=3),
+        ActivationLayer(),
+        MaskGlobalAvgPool1d(),
+        Linear(512, 512),
+        ActivationLayer(),
+    )
 
 
 _G_REGS = LookUpCall({
@@ -105,6 +160,17 @@ _OPTIMIZERS = LookUpCall(
     },
 )
 
+_D_MODELS = LookUpCall(
+    {
+        key: ArgumentBinder(func, preserved=['input_size'])
+        for key, func in [
+            ('cnn', cnn),
+            ('resnet', resnet),
+            ('test', lambda input_size: MaskGlobalAvgPool1d(dim=1)),
+        ]
+    },
+    set_info=True,
+)
 _ESTIMATORS = LookUpCall({
     'reinforce': ReinforceEstimator,
     'st': StraightThroughEstimator,

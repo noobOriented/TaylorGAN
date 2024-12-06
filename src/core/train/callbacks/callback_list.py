@@ -1,9 +1,11 @@
+import typing as t
+
 from .base import Callback
 
 
 class CallbackList(Callback):
 
-    def __init__(self, callbacks: list[Callback]):
+    def __init__(self, callbacks: t.Sequence[Callback]):
         self.callbacks = callbacks
 
     def on_train_begin(self, is_restored: bool):
