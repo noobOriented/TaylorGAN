@@ -17,8 +17,8 @@ tensorflow-hub = "0.7.0"
 tqdm = "^4.40.0"
 u-msgpack-python = "*"
 pyyaml = "*"
-flexparse = { git = "https://github.com/noobOriented/flexparse.git", branch = "main" }
-torch = "^1.7.1"
+torch = "^2.0.0"
+pydantic = "^2.10.2"
 
 [tool.poetry.group.dev.dependencies]
 wemake-python-styleguide = ">=0.17"
@@ -26,6 +26,10 @@ ipdb = "*"
 pytest = "*"
 pytest-cov = "*"
 pytest-dependency = "*"
+
+[tool.poetry.scripts]
+GAN = "scripts.train:GAN_main"
+MLE = "scripts.train:MLE_main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

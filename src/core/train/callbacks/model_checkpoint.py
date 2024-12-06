@@ -2,6 +2,8 @@ import os
 import sys
 from pathlib import Path
 
+import pydantic
+
 from core.train.trainers import Trainer
 from library.utils import format_path
 
@@ -10,7 +12,8 @@ from .base import Callback
 
 class ModelCheckpoint(Callback):
 
-    def __init__(self, trainer: Trainer, directory: Path, period: int):
+    def __init__(self, args: pydantic.BaseModel, trainer: Trainer, directory: Path, period: int):
+        self.args = args  # TODO global?
         self.trainer = trainer
         self.directory = directory
         if period <= 0:
@@ -20,8 +23,8 @@ class ModelCheckpoint(Callback):
     def on_train_begin(self, is_restored: bool):
         self.directory.mkdir(exist_ok=True)
         if not is_restored:
-            with open(self.directory / "args", "w") as f:
-                f.write(" ".join(sys.argv))
+            with open(self.directory / 'args', 'w') as f:
+                f.write(self.args.model_dump_json())
 
     def on_epoch_end(self, epoch: int):
         if epoch % self.period == 0:
