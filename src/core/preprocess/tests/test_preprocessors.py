@@ -1,9 +1,11 @@
-import numpy as np
-import pytest
 import pathlib
 
-from .. import CorpusConfig, Segmentor, Preprocessor, Tokenizer
+import numpy as np
+import pytest
+
+from .. import CorpusConfig, Preprocessor, Segmentor, Tokenizer
 from .._config_objects import WordEmbeddingCollection
+from .._ops import SplitEnglish
 
 
 @pytest.fixture(scope='session')
@@ -24,7 +26,7 @@ def corpus_config(data_dir: pathlib.Path):
         path=data_dir / 'train.txt',
         maxlen=10,
         embedding_path=data_dir / 'en_fasttext_word2vec_V100D20.json',
-        segmentor=Segmentor(split_token=' '),
+        segmentor=Segmentor(split_token=' ', operators=[SplitEnglish(type='split-english')]),
     )
 
 

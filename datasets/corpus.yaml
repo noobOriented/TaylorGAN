@@ -2,6 +2,13 @@
   embedding_path: datasets/en_fasttext_V80000D300.json
   segmentor:
     split_token: ' '
+    operators:
+      - type: sub
+        pattern: '\s+'
+        repl: ' '
+      - type: strip
+      - type: lower
+      - type: split-english
 
 coco_cleaned:
   path:
@@ -19,8 +26,7 @@ news_cleaned:
 
 test:
   path: datasets/train.txt
-  segmentor:
-    split_token: ' '
+  <<: *english_common
   embedding_path: datasets/en_fasttext_word2vec_V100D20.json
   maxlen: 10
   vocab_size: 20
