@@ -3,40 +3,13 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from ..cache_utils import (
-    JSONCache, JSONSerializableMixin, NumpyCache, PickleCache, reuse_method_call,
-)
-
-
-class A(JSONSerializableMixin):
-
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-    def get_config(self):
-        return {'x': self.x, 'y': self.y}
-
-
-class B(JSONSerializableMixin):
-
-    def __init__(self, a):
-        self.a = a
-
-    def get_config(self):
-        return {'a': self.a.serialize()}
-
-    @classmethod
-    def from_config(cls, config_dict):
-        return cls(A.deserialize(config_dict['a']))
+from ..cache_utils import NumpyCache, PickleCache, reuse_method_call
 
 
 @pytest.mark.parametrize(
     'cacher, output, filename',
     [
         (PickleCache, {'a': 1, 'b': 2, 'c': [3, 4]}, 'test.pkl'),
-        (JSONCache, A(1, 2), 'a.json'),
-        (JSONCache, B(A(3, 4)), 'b.json'),
         (NumpyCache, np.random.choice(100, size=[100]), 'test.npz'),
     ],
 )
@@ -91,26 +64,6 @@ def test_cache_callable_path(tmpdir):
 
     assert wrapped_create('b.pkl') == output
     assert create.call_count == 2  # different key, create again
-
-
-def test_deserialize_subclass_and_non_subclass():
-
-    class C(JSONSerializableMixin):
-
-        def __init__(self, x):
-            self.x = x
-
-        def get_config(self):
-            return {'x': self.x}
-
-    class D(C):
-
-        pass
-
-    assert C.deserialize(D(3).serialize()) == D(3)
-
-    with pytest.raises(ValueError):
-        D.deserialize(C(1).serialize())
 
 
 def test_reuse_method_call():

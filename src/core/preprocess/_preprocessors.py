@@ -10,9 +10,10 @@ import typing as t
 import more_itertools
 import numpy as np
 import numpy.typing as npt
+import pydantic
 
 from core.cache import cache_center
-from library.utils import JSONSerializableMixin, format_path, logging_indent, tqdm_open
+from library.utils import format_path, logging_indent, tqdm_open
 
 from ._config_objects import CorpusConfig, LanguageConfig, SpecialTokenConfig
 
@@ -24,10 +25,19 @@ class Preprocessor:
 
     def preprocess(self):
         with logging_indent("Prepare text tokenizer..."):
-            @cache_center.to_json(self._cache_dir / 'tokenizer.json')
+
             def create_tokenizer():
+                p = self._cache_dir / 'tokenizer.json'
+                if p.exists():
+                    with open(p) as f:
+                        return Tokenizer.model_validate_json(f.read())
+
                 print(f'Build text mapper based on corpus data from {format_path(self.corpus_config.path["train"])}')
-                return Tokenizer.fit_corpus(self.corpus_config)
+                tokenizer = Tokenizer.fit_corpus(self.corpus_config)
+                self._cache_dir.mkdir(parents=True, exist_ok=True)
+                with open(p, 'w') as f:
+                    f.write(tokenizer.model_dump_json(indent=2))
+                return tokenizer
 
             tokenizer = create_tokenizer()
 
@@ -87,21 +97,22 @@ class MetaData:
         return embeddings
 
 
-class Tokenizer(JSONSerializableMixin):
+class Tokenizer(pydantic.BaseModel):
+    tokens: list[str]
+    language_config: LanguageConfig
+    maxlen: int
 
-    special_token_config = SpecialTokenConfig(
+    special_token_config: t.ClassVar = SpecialTokenConfig(
         sos='<sos>',
         eos='</s>',
         pad='<pad>',
         unk='<unk>',
     )
-    eos_idx = special_token_config.eos.idx
+    eos_idx: t.ClassVar[int] = special_token_config.eos.idx
 
-    def __init__(self, tokens: list[str], language_config: LanguageConfig, maxlen: int):
-        self.tokens = tokens
-        self.maxlen = maxlen
-        self.language_config = language_config
-        self._token2index = {token: i for i, token in enumerate(tokens)}
+    @functools.cached_property
+    def _token2index(self):
+        return {token: i for i, token in enumerate(self.tokens)}
 
     def texts_to_array(self, texts: t.Iterable[str]) -> npt.NDArray[np.int32]:
         return np.asarray(
@@ -154,21 +165,6 @@ class Tokenizer(JSONSerializableMixin):
             tokens=tokens,
             language_config=corpus_config.language_config,
             maxlen=maxlen,
-        )
-
-    def get_config(self):
-        return {
-            'tokens': self.tokens,
-            'language_config': self.language_config.get_config(),
-            'maxlen': self.maxlen,
-        }
-
-    @classmethod
-    def from_config(cls, config_dict):
-        return cls(
-            tokens=config_dict['tokens'],
-            language_config=LanguageConfig.from_config(config_dict['language_config']),
-            maxlen=config_dict['maxlen'],
         )
 
 

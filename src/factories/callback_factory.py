@@ -121,7 +121,8 @@ class _CallbackCreator:
         if serving_root:
             serving_dir = serving_root / self.tag
             serving_dir.mkdir(exist_ok=True)
-            self.metadata.tokenizer.save(serving_dir / 'tokenizer.json')
+            with open(serving_dir / 'tokenizer.json', 'w') as f:
+                f.write(self.metadata.tokenizer.model_dump_json())
             yield ModelSaver(
                 module=self.text_generator,
                 directory=serving_dir,

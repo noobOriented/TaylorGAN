@@ -19,11 +19,3 @@ class TestTokenizer:
 
         assert text1 == text2
         assert ids1 == ids2
-
-    def test_save_load(self, tokenizer, tmpdir):
-        path = tmpdir / 'tokenizer.json'
-        tokenizer.save(path)
-        loaded = Tokenizer.load(path)
-
-        assert tokenizer.tokens == loaded.tokens
-        assert tokenizer.maxlen == loaded.maxlen

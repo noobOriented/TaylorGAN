@@ -1,3 +1,4 @@
+import os
 import typing as t
 
 import numpy as np
@@ -14,7 +15,7 @@ class WordEmbeddingCollection:
         self.vectors = np.asarray(vectors, np.float32)
 
     @classmethod
-    def load_msg(cls, path: str):
+    def load_msg(cls, path: str | os.PathLike[str]):
         with open(path, "rb") as f_in:
             params = umsgpack.unpack(f_in)
         return cls(token2index=params['token2index'], vectors=params['vector'])

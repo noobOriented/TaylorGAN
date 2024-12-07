@@ -1,20 +1,20 @@
 import os
+import pathlib
 import re
 import typing as t
 import unicodedata
 
 import more_itertools
+import pydantic
 
-from library.utils import JSONSerializableMixin, format_path, logging_indent, tqdm_open
+from library.utils import format_path, logging_indent, tqdm_open
 
 from ._adaptors import WordEmbeddingCollection
 
 
-class LanguageConfig(JSONSerializableMixin):
-
-    def __init__(self, embedding_path: str | None, split_token: str = ''):
-        self.embedding_path = embedding_path
-        self.split_token = split_token
+class LanguageConfig(pydantic.BaseModel):
+    embedding_path: pathlib.Path
+    split_token: str = ''
 
     def segmentize_text(self, text: str) -> list[str]:
         text = re.sub(r'\s+', ' ', text)
@@ -25,18 +25,16 @@ class LanguageConfig(JSONSerializableMixin):
     def load_pretrained_embeddings_msg(self) -> WordEmbeddingCollection:
         if not (self.embedding_path and os.path.isfile(self.embedding_path)):
             raise FileNotFoundError(f"invalid embedding_path: {self.embedding_path}")
+
         print(f"Load pretrained embedding from : {format_path(self.embedding_path)}")
         return WordEmbeddingCollection.load_msg(self.embedding_path)
 
     def get_config(self):
-        return {
-            'embedding_path': str(self.embedding_path),
-            'split_token': self.split_token,
-        }
+        return self.model_dump(mode='json')
 
     @classmethod
     def from_config(cls, config_dict):
-        return cls(**config_dict)
+        return cls.model_validate(config_dict)
 
 
 class CorpusConfig:

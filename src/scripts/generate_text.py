@@ -27,7 +27,9 @@ def main():
     )
     args = parser.parse_args()
 
-    tokenizer = Tokenizer.load(args.model_path.parent / 'tokenizer.json')
+    with open(args.model_path.parent / 'tokenizer.json') as f:
+        tokenizer = Tokenizer.model_validate_json(f.read())
+
     generator = TextGenerator.load_traced(args.model_path, tokenizer=tokenizer)
     print(f"Generate sentences to '{args.export_path}'")
     with open(args.export_path, 'w') as f_out:

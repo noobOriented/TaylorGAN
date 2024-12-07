@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from functools import lru_cache, wraps
 
 import numpy as np
+import pydantic
 
 from .format_utils import format_path
 from .func_utils import ObjectWrapper
@@ -72,20 +73,18 @@ class NumpyCache(FileCache):
         np.savez_compressed(path, data=data)
 
 
-_subclass_map = {}
-
-
 class JSONSerializableMixin:
+    _subclass_map: dict[str, type] = {}
 
     @classmethod
     def __init_subclass__(cls):
-        _subclass_map[cls.__name__] = cls
+        cls._subclass_map[cls.__name__] = cls
 
     def serialize(self):
         return json.dumps(
             {
                 'class_name': self.__class__.__name__,
-                'config': self.get_config(),
+                'config': pydantic.TypeAdapter(self.__class__).dump_python(self, mode='json'),
             },
             indent=2,
         )
@@ -93,44 +92,10 @@ class JSONSerializableMixin:
     @classmethod
     def deserialize(cls, data: str):
         params = json.loads(data)
-        subclass = _subclass_map[params['class_name']]
+        subclass = cls._subclass_map[params['class_name']]
         if not issubclass(subclass, cls):
-            raise ValueError(
-                f"{cls.__name__}.deserialize on non-subclass {subclass.__name__} is forbidden!",
-            )
-        return subclass.from_config(params['config'])
-
-    def save(self, path):
-        with open(path, 'w') as f_out:
-            f_out.write(self.serialize())
-
-    @classmethod
-    def load(cls, path):
-        with open(path, 'r') as f_in:
-            return cls.deserialize(f_in.read())
-
-    def get_config(self):
-        raise NotImplementedError
-
-    @classmethod
-    def from_config(cls, config_dict):
-        # NOTE is not necessary to be dict,
-        #      but should be consistent with return type of get_config
-        return cls(**config_dict)
-
-    def __eq__(self, other):
-        return (self.__class__, self.get_config()) == (other.__class__, other.get_config())
-
-
-class JSONCache(FileCache):
-
-    @staticmethod
-    def load_data(path):
-        return JSONSerializableMixin.load(path)
-
-    @staticmethod
-    def save_data(instance, path: str):
-        instance.save(path)
+            raise ValueError(f'{cls.__name__}.deserialize on non-subclass {subclass.__name__} is forbidden!')
+        return pydantic.TypeAdapter(subclass).validate_python(params['config'])
 
 
 @contextmanager
