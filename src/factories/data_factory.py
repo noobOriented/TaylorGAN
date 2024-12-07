@@ -34,25 +34,18 @@ class DataConfigs(pydantic.BaseModel):
 
     def load_data(self) -> tuple[dict[str, TextDataset], MetaData]:
         print(f"data_id: {format_id(self.dataset)}")
-        preprocessor = Preprocessor(self.maxlen, self.vocab_size)
-        corpus_config = _load_corpus_table(CONFIG_PATH)[self.dataset]
-        return preprocessor.preprocess(corpus_config, return_meta=True)
+        with open(CONFIG_PATH) as f:
+            corpus_dict = yaml.load(f, Loader=yaml.FullLoader)[self.dataset]
 
+        language_id = corpus_dict['language']
+        corpus_config = CorpusConfig(
+            self.dataset,
+            path=corpus_dict['path'],
+            language_config=LANGUAGE_CONFIGS[language_id],
+            maxlen=corpus_dict.get('maxlen', self.maxlen),
+            vocab_size=corpus_dict.get('vocab_size', self.maxlen),
+        )
+        if not ('train' in corpus_config.path and all(os.path.isfile(p) for p in corpus_config.path.values())):
+            raise KeyError  # TODO else warning?
 
-def _load_corpus_table(path):
-    corpus_table: dict[str, CorpusConfig] = {}
-    with open(path) as f:
-        for data_id, corpus_dict in yaml.load(f, Loader=yaml.FullLoader).items():
-            language_id = corpus_dict['language']
-            config = CorpusConfig(
-                data_id,
-                path=corpus_dict['path'],
-                language_config=LANGUAGE_CONFIGS[language_id],
-                maxlen=corpus_dict.get('maxlen'),
-                vocab_size=corpus_dict.get('vocab_size'),
-            )
-            if 'train' in config.path and all(os.path.isfile(p) for p in config.path.values()):
-                # TODO else warning?
-                corpus_table[data_id] = config
-
-    return corpus_table
+        return Preprocessor(corpus_config).preprocess()

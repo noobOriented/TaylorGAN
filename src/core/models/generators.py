@@ -32,22 +32,22 @@ class Generator(Module, ModuleInterface):
 class AutoRegressiveGenerator(Generator):
 
     def __init__(
-            self,
-            cell: Module,
-            embedder: Module,
-            output_layer: Module,
-            special_token_config: SpecialTokenConfig,
-        ):
+        self,
+        cell: Module,
+        embedder: Module,
+        output_layer: Module,
+        special_token_config: SpecialTokenConfig,
+    ):
         super().__init__(embedder, special_token_config)
         self.cell = cell
         self.output_layer = output_layer
 
     def generate(
-            self,
-            batch_size: int,
-            maxlen: int,
-            temperature: float = None,
-        ) -> SampledTokenSequence:
+        self,
+        batch_size: int,
+        maxlen: int,
+        temperature: float | None = None,
+    ) -> SampledTokenSequence:
         word_idx, state = self._get_start_token_and_state(batch_size)
         logits_list, ids_list, gv_list = [], [], []
 

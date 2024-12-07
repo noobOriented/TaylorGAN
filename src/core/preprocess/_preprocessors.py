@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections
 import dataclasses
+import functools
 import itertools
 import pathlib
 import typing as t
@@ -18,35 +19,22 @@ from ._config_objects import CorpusConfig, LanguageConfig, SpecialTokenConfig
 
 class Preprocessor:
 
-    def __init__(self, maxlen: int | None = None, vocab_size: int | None = None):
-        self.maxlen = maxlen
-        self.vocab_size = vocab_size
+    def __init__(self, corpus_config: CorpusConfig):
+        self.corpus_config = corpus_config
 
-    @t.overload
-    def preprocess(self, corpus_config: CorpusConfig, return_meta: t.Literal[True]) -> tuple[dict[str, TextDataset], MetaData]:
-        ...
-
-    @t.overload
-    def preprocess(self, corpus_config: CorpusConfig, return_meta: bool = False) -> dict[str, TextDataset]:
-        ...
-
-    def preprocess(self, corpus_config: CorpusConfig, return_meta: bool = False):
+    def preprocess(self):
         with logging_indent("Prepare text tokenizer..."):
-            @cache_center.to_json(self.get_cache_dir(corpus_config) / 'tokenizer.json')
+            @cache_center.to_json(self._cache_dir / 'tokenizer.json')
             def create_tokenizer():
-                print(f'Build text mapper based on corpus data from {format_path(corpus_config.path["train"])}')
-                return Tokenizer.fit_corpus(
-                    corpus_config,
-                    maxlen=self.maxlen,
-                    vocab_size=self.vocab_size,
-                )
+                print(f'Build text mapper based on corpus data from {format_path(self.corpus_config.path["train"])}')
+                return Tokenizer.fit_corpus(self.corpus_config)
 
             tokenizer = create_tokenizer()
 
         with logging_indent("Preprocess text corpus..."):
             data_collection: dict[str, TextDataset] = {}
-            for key, path in corpus_config.path.items():
-                @cache_center.to_npz(self.get_cache_dir(corpus_config) / f'{key}_data.npz')
+            for key, path in self.corpus_config.path.items():
+                @cache_center.to_npz(self._cache_dir / f'{key}_data.npz')
                 def _process_text_file(filepath):
                     print(f"Load corpus data from {format_path(filepath)}")
                     with tqdm_open(filepath) as f:
@@ -58,22 +46,17 @@ class Preprocessor:
                     text_dataset = TextDataset(ids=ids, texts=texts)
                     data_collection[key] = text_dataset
 
-        if return_meta:
-            metadata = MetaData(
-                tokenizer=tokenizer,
-                corpus_config=corpus_config,
-                cache_dir=self.get_cache_dir(corpus_config),
-            )
-            return data_collection, metadata
-        return data_collection
+        metadata = MetaData(tokenizer=tokenizer, cache_dir=self._cache_dir)
+        return data_collection, metadata
 
-    def get_cache_dir(self, corpus_config: CorpusConfig):
+    @functools.cached_property
+    def _cache_dir(self):
         items = ["uttut"]
-        if self.maxlen:
-            items.append(f"L{self.maxlen}")
-        if self.vocab_size:
-            items.append(f"V{self.vocab_size}")
-        return pathlib.Path(corpus_config.name, "_".join(items))
+        if self.corpus_config.maxlen:
+            items.append(f"L{self.corpus_config.maxlen}")
+        if self.corpus_config.vocab_size:
+            items.append(f"V{self.corpus_config.vocab_size}")
+        return pathlib.Path(self.corpus_config.name, "_".join(items))
 
 
 @dataclasses.dataclass
@@ -88,14 +71,13 @@ class TextDataset:
 @dataclasses.dataclass
 class MetaData:
     tokenizer: Tokenizer
-    corpus_config: CorpusConfig
     cache_dir: pathlib.Path
 
     def load_pretrained_embeddings(self) -> npt.NDArray[np.floating]:
 
         @cache_center.to_npz(self.cache_dir / 'word_vecs.npz')
         def load_embeddings():
-            word_vec_config = self.corpus_config.language_config.load_pretrained_embeddings_msg()
+            word_vec_config = self.tokenizer.language_config.load_pretrained_embeddings_msg()
             return word_vec_config.get_matrix_of_tokens(self.tokenizer.tokens)
 
         with logging_indent("Load pretrained embeddings:"):
@@ -103,14 +85,6 @@ class MetaData:
             print(f"Dimensions: {embeddings.shape[1]}.")
 
         return embeddings
-
-    @property
-    def eos_idx(self) -> int:
-        return self.tokenizer.eos_idx
-
-    @property
-    def special_token_config(self):
-        return self.tokenizer.special_token_config
 
 
 class Tokenizer(JSONSerializableMixin):
@@ -160,9 +134,9 @@ class Tokenizer(JSONSerializableMixin):
         return self.language_config.split_token.join(tokens)
 
     @classmethod
-    def fit_corpus(cls, corpus_config: CorpusConfig, maxlen: int | None = None, vocab_size: int | None = None):
-        maxlen = maxlen or corpus_config.maxlen
-        vocab_size = vocab_size or corpus_config.vocab_size
+    def fit_corpus(cls, corpus_config: CorpusConfig):
+        maxlen = corpus_config.maxlen
+        vocab_size = corpus_config.vocab_size
         if maxlen:
             token_freq = collections.Counter(more_itertools.flatten(
                 more_itertools.take(maxlen, sen)
@@ -175,8 +149,9 @@ class Tokenizer(JSONSerializableMixin):
             cls.special_token_config.tokens,
             [token for token, _ in token_freq.most_common()],
         ))
+        tokens = more_itertools.take(vocab_size, all_tokens) if vocab_size else list(all_tokens)
         return cls(
-            tokens=more_itertools.take(n=vocab_size, iterable=all_tokens),
+            tokens=tokens,
             language_config=corpus_config.language_config,
             maxlen=maxlen,
         )
@@ -197,7 +172,7 @@ class Tokenizer(JSONSerializableMixin):
         )
 
 
-def _get_freq_and_maxlen[T](sentences: t.Iterable[t.Sequence[T]]) -> tuple[collections.Counter[T], int]:
+def _get_freq_and_maxlen[T](sentences: t.Iterable[t.Sequence[T]], /) -> tuple[collections.Counter[T], int]:
     freq = collections.Counter()
     maxlen = 0
     for sen in sentences:

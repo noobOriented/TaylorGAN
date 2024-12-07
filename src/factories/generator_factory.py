@@ -37,7 +37,7 @@ class GeneratorConfigs(pydantic.BaseModel):
                 Linear(cell.hidden_size, embedder.embedding_dim, bias=False),
                 presoftmax_layer,
             ),
-            special_token_config=metadata.special_token_config,
+            special_token_config=metadata.tokenizer.special_token_config,
         )
 
 

@@ -171,7 +171,7 @@ class EvaluatorCreator:
     def _attach_basic(self, sample_size, evaluator):
 
         def mean_length(word_ids):
-            return {'mean_length': np.mean(get_seqlens(word_ids, self.metadata.eos_idx))}
+            return {'mean_length': np.mean(get_seqlens(word_ids, self.metadata.tokenizer.eos_idx))}
 
         def log_texts(texts: list[str]):
             print(SEPARATION_LINE)
@@ -198,7 +198,7 @@ class EvaluatorCreator:
     def _attach_bleu(self, max_gram, sample_size, evaluator):
         shared_kwargs = dict(
             max_gram=max_gram,
-            eos_idx=self.metadata.eos_idx,
+            eos_idx=self.metadata.tokenizer.eos_idx,
             smoothing=SmoothingFunction.fuzz_smoothing,
         )
         for tag, dataset in self.data_collection.items():

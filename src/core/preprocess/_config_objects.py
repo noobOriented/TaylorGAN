@@ -97,10 +97,7 @@ class SpecialTokenConfig:
 
 def _tokenize(s: str) -> list[str]:
     orig_tokens = s.split()
-    split_tokens = more_itertools.flatten(
-        _run_split_on_punc(token)
-        for token in orig_tokens
-    )
+    split_tokens = more_itertools.flatten(map(_run_split_on_punc, orig_tokens))
     return ' '.join(split_tokens).split()
 
 
