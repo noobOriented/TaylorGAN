@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import pathlib
 
-from .. import CorpusConfig, LanguageConfig, Preprocessor, Tokenizer
+from .. import CorpusConfig, Segmentor, Preprocessor, Tokenizer
 from .._config_objects import WordEmbeddingCollection
 
 
@@ -18,20 +18,13 @@ def redirect_cache_root(cache_root_dir):
 
 
 @pytest.fixture(scope='session')
-def language_config(data_dir):
-    return LanguageConfig(
-        embedding_path=data_dir / 'en_fasttext_word2vec_V100D20.json',
-        split_token=' ',
-    )
-
-
-@pytest.fixture(scope='session')
-def corpus_config(data_dir: pathlib.Path, language_config):
+def corpus_config(data_dir: pathlib.Path):
     return CorpusConfig(
         name='test',
         path=data_dir / 'train.txt',
         maxlen=10,
-        language_config=language_config,
+        embedding_path=data_dir / 'en_fasttext_word2vec_V100D20.json',
+        segmentor=Segmentor(split_token=' '),
     )
 
 

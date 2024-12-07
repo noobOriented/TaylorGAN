@@ -31,11 +31,11 @@ class WordEmbeddingCollection(pydantic.BaseModel):
         return np.zeros_like(self.vectors[0])
 
 
-class LanguageConfig(pydantic.BaseModel):
-    embedding_path: pathlib.Path
+class Segmentor(pydantic.BaseModel):
     split_token: str = ' '
 
     def segmentize_text(self, s: str) -> list[str]:
+        # TODO serializable?
         s = re.sub(r'\s+', ' ', s)
         s = s.strip()
         s = s.lower()
@@ -43,11 +43,15 @@ class LanguageConfig(pydantic.BaseModel):
         split_tokens = more_itertools.flatten(map(_run_split_on_punc, orig_tokens))
         return self.split_token.join(split_tokens).split(self.split_token)
 
+    def join_text(self, texts: list[str]) -> str:
+        return self.split_token.join(texts)
+
 
 class CorpusConfig(pydantic.BaseModel):
     name: str
     path: dict[str, pathlib.Path]
-    language_config: LanguageConfig
+    segmentor: Segmentor
+    embedding_path: pathlib.Path
     maxlen: int | None = None  # used when preprocessor.maxlen = None
     vocab_size: int | None = None  # used when preprocessor.vocab_size = None
 
@@ -59,7 +63,7 @@ class CorpusConfig(pydantic.BaseModel):
     def iter_train_sentences(self) -> t.Iterator[list[str]]:
         with tqdm_open(self.path['train']) as it:
             for s in it:
-                yield self.language_config.segmentize_text(s)
+                yield self.segmentor.segmentize_text(s)
 
     @property
     def cache_path(self):

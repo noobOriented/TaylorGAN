@@ -1,24 +1,26 @@
+.english_common: &english_common
+  embedding_path: datasets/en_fasttext_V80000D300.json
+  segmentor:
+    split_token: ' '
+
 coco_cleaned:
   path:
     train: datasets/coco_cleaned_train.txt
     valid: datasets/coco_cleaned_valid.txt
-  language: &english
-    embedding_path: datasets/en_fasttext_V80000D300.json
-    split_token: ' '
+  <<: *english_common
   maxlen: 24
 
 news_cleaned:
   path:
     train: datasets/news_cleaned_train.txt
     valid: datasets/news_cleaned_valid.txt
-  language:
-    <<: *english
+  <<: *english_common
   maxlen: 50
 
 test:
   path: datasets/train.txt
-  language:
-    embedding_path: datasets/en_fasttext_word2vec_V100D20.json
+  segmentor:
     split_token: ' '
+  embedding_path: datasets/en_fasttext_word2vec_V100D20.json
   maxlen: 10
   vocab_size: 20

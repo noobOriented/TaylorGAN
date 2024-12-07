@@ -20,16 +20,11 @@ class DataConfigs(pydantic.BaseModel):
 
     def load_data(self) -> tuple[dict[str, TextDataset], MetaData]:
         print(f"data_id: {format_id(self.dataset)}")
+        d = {'name': self.dataset, 'maxlen': self.maxlen, 'vocab_size': self.vocab_size}
         with open(CONFIG_PATH) as f:
-            corpus_dict = yaml.load(f, Loader=yaml.FullLoader)[self.dataset]
+            d |= yaml.safe_load(f)[self.dataset]
     
-        corpus_config = CorpusConfig(
-            name=self.dataset,
-            path=corpus_dict['path'],
-            language_config=corpus_dict['language'],
-            maxlen=corpus_dict.get('maxlen', self.maxlen),
-            vocab_size=corpus_dict.get('vocab_size', self.maxlen),
-        )
+        corpus_config = CorpusConfig(**d)
         if not ('train' in corpus_config.path and all(p.exists() for p in corpus_config.path.values())):
             raise KeyError  # TODO else warning?
 

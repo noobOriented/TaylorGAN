@@ -16,7 +16,7 @@ from core.cache import cache_center
 from library.utils import format_path, logging_indent, tqdm_open
 
 from ._config_objects import (
-    CorpusConfig, LanguageConfig, SpecialTokenConfig, WordEmbeddingCollection,
+    CorpusConfig, Segmentor, SpecialTokenConfig, WordEmbeddingCollection,
 )
 
 
@@ -44,7 +44,11 @@ class Preprocessor:
                     text_dataset = TextDataset(ids=ids, texts=texts)
                     data_collection[key] = text_dataset
 
-        metadata = MetaData(tokenizer=tokenizer, cache_dir=self.corpus_config.cache_path)
+        metadata = MetaData(
+            tokenizer=tokenizer,
+            embedding_path=self.corpus_config.embedding_path,
+            cache_dir=self.corpus_config.cache_path,
+        )
         return data_collection, metadata
 
     def _create_tokenizer(self):
@@ -75,15 +79,15 @@ class TextDataset:
 @dataclasses.dataclass
 class MetaData:
     tokenizer: Tokenizer
+    embedding_path: pathlib.Path
     cache_dir: pathlib.Path
 
     def load_pretrained_embeddings(self) -> npt.NDArray[np.floating]:
 
         @cache_center.to_npz(self.cache_dir / 'word_vecs.npz')
         def load_embeddings():
-            language_config = self.tokenizer.language_config
-            print(f"Load pretrained embedding from : {format_path(language_config.embedding_path)}")
-            with open(language_config.embedding_path) as f:
+            print(f"Load pretrained embedding from : {format_path(self.embedding_path)}")
+            with open(self.embedding_path) as f:
                 wv = WordEmbeddingCollection.model_validate_json(f.read())
             return wv.get_matrix_of_tokens(self.tokenizer.tokens)
 
@@ -96,7 +100,7 @@ class MetaData:
 
 class Tokenizer(pydantic.BaseModel):
     tokens: list[str]
-    language_config: LanguageConfig
+    segmentor: Segmentor
     maxlen: int
 
     special_token_config: t.ClassVar = SpecialTokenConfig(
@@ -107,28 +111,14 @@ class Tokenizer(pydantic.BaseModel):
     )
     eos_idx: t.ClassVar[int] = special_token_config.eos.idx
 
-    @functools.cached_property
-    def _token2index(self):
-        return {token: i for i, token in enumerate(self.tokens)}
-
     def texts_to_array(self, texts: t.Iterable[str]) -> npt.NDArray[np.int32]:
         return np.asarray(
             [self.text_to_ids(s) for s in texts],
             dtype=np.int32,
         )
 
-    @property
-    def vocab_size(self) -> int:
-        return len(self.tokens)
-
-    def summary(self):
-        with logging_indent(f"{self.__class__.__name__} summary:"):
-            print(f"Maxlen: {self.maxlen}.")
-            print(f"Vocabulary size: {self.vocab_size}.")
-            self.special_token_config.summary()
-
     def text_to_ids(self, text: str) -> list[int]:
-        tokens = self.language_config.segmentize_text(text)
+        tokens = self.segmentor.segmentize_text(text)
         tokens.append(self.special_token_config.eos.token)
         tokens = more_itertools.padded(tokens, self.special_token_config.pad.token)
         tokens = more_itertools.take(self.maxlen, tokens)
@@ -139,7 +129,7 @@ class Tokenizer(pydantic.BaseModel):
 
     def ids_to_text(self, ids: t.Sequence[int]) -> str:
         tokens = [self.tokens[idx] for idx in itertools.takewhile(lambda x: x != self.eos_idx, ids)]
-        return self.language_config.split_token.join(tokens)
+        return self.segmentor.join_text(tokens)
 
     @classmethod
     def fit_corpus(cls, corpus_config: CorpusConfig):
@@ -160,9 +150,19 @@ class Tokenizer(pydantic.BaseModel):
         tokens = more_itertools.take(vocab_size, all_tokens) if vocab_size else list(all_tokens)
         return cls(
             tokens=tokens,
-            language_config=corpus_config.language_config,
+            segmentor=corpus_config.segmentor,
             maxlen=maxlen,
         )
+
+    def summary(self):
+        with logging_indent(f"{self.__class__.__name__} summary:"):
+            print(f"Maxlen: {self.maxlen}.")
+            print(f"Vocabulary size: {len(self.tokens)}.")
+            self.special_token_config.summary()
+
+    @functools.cached_property
+    def _token2index(self):
+        return {token: i for i, token in enumerate(self.tokens)}
 
 
 def _get_freq_and_maxlen[T](sentences: t.Iterable[t.Sequence[T]], /) -> tuple[collections.Counter[T], int]:
