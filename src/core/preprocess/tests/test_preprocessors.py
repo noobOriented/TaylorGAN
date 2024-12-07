@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import pathlib
 
 from .. import CorpusConfig, LanguageConfig, Preprocessor, Tokenizer
 from .._config_objects import WordEmbeddingCollection
@@ -25,9 +26,9 @@ def language_config(data_dir):
 
 
 @pytest.fixture(scope='session')
-def corpus_config(data_dir, language_config):
+def corpus_config(data_dir: pathlib.Path, language_config):
     return CorpusConfig(
-        'test',
+        name='test',
         path=data_dir / 'train.txt',
         maxlen=10,
         language_config=language_config,

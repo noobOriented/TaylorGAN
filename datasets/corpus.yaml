@@ -2,18 +2,23 @@ coco_cleaned:
   path:
     train: datasets/coco_cleaned_train.txt
     valid: datasets/coco_cleaned_valid.txt
-  language: english
+  language: &english
+    embedding_path: datasets/en_fasttext_V80000D300.json
+    split_token: ' '
   maxlen: 24
 
 news_cleaned:
   path:
     train: datasets/news_cleaned_train.txt
     valid: datasets/news_cleaned_valid.txt
-  language: english
+  language:
+    <<: *english
   maxlen: 50
 
 test:
   path: datasets/train.txt
-  language: test
+  language:
+    embedding_path: datasets/en_fasttext_word2vec_V100D20.json
+    split_token: ' '
   maxlen: 10
   vocab_size: 20

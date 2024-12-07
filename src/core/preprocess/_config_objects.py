@@ -1,4 +1,3 @@
-import os
 import pathlib
 import re
 import typing as t
@@ -9,7 +8,7 @@ import numpy as np
 import numpy.typing as npt
 import pydantic
 
-from library.utils import format_path, logging_indent, tqdm_open
+from library.utils import logging_indent, tqdm_open
 
 
 class WordEmbeddingCollection(pydantic.BaseModel):
@@ -34,53 +33,43 @@ class WordEmbeddingCollection(pydantic.BaseModel):
 
 class LanguageConfig(pydantic.BaseModel):
     embedding_path: pathlib.Path
-    split_token: str = ''
+    split_token: str = ' '
 
-    def segmentize_text(self, text: str) -> list[str]:
-        text = re.sub(r'\s+', ' ', text)
-        text = text.strip()
-        text = text.lower()
-        return _tokenize(text)
+    def segmentize_text(self, s: str) -> list[str]:
+        s = re.sub(r'\s+', ' ', s)
+        s = s.strip()
+        s = s.lower()
+        orig_tokens = s.split(self.split_token)
+        split_tokens = more_itertools.flatten(map(_run_split_on_punc, orig_tokens))
+        return self.split_token.join(split_tokens).split(self.split_token)
 
-    def load_pretrained_embeddings_msg(self) -> WordEmbeddingCollection:
-        if not (self.embedding_path and os.path.isfile(self.embedding_path)):
-            raise FileNotFoundError(f"invalid embedding_path: {self.embedding_path}")
 
-        print(f"Load pretrained embedding from : {format_path(self.embedding_path)}")
-        with open(self.embedding_path) as f:
-            return WordEmbeddingCollection.model_validate_json(f.read())
+class CorpusConfig(pydantic.BaseModel):
+    name: str
+    path: dict[str, pathlib.Path]
+    language_config: LanguageConfig
+    maxlen: int | None = None  # used when preprocessor.maxlen = None
+    vocab_size: int | None = None  # used when preprocessor.vocab_size = None
 
-    def get_config(self):
-        return self.model_dump(mode='json')
-
+    @pydantic.field_validator('path', mode='before')
     @classmethod
-    def from_config(cls, config_dict):
-        return cls.model_validate(config_dict)
-
-
-class CorpusConfig:
-
-    def __init__(
-        self,
-        name: str,
-        path: str | t.Mapping[str, str],
-        language_config: LanguageConfig,
-        maxlen: int | None = None,  # used when preprocessor.maxlen = None
-        vocab_size: int | None = None,  # used when preprocessor.vocab_size = None
-    ):
-        if not isinstance(path, t.Mapping):
-            path = {'train': path}
-
-        self.name = name
-        self.path = path
-        self.language_config = language_config
-        self.maxlen = maxlen
-        self.vocab_size = vocab_size
+    def _parse_path_str(cls, v):
+        return v if isinstance(v, t.Mapping) else {'train': v}
 
     def iter_train_sentences(self) -> t.Iterator[list[str]]:
         with tqdm_open(self.path['train']) as it:
             for s in it:
                 yield self.language_config.segmentize_text(s)
+
+    @property
+    def cache_path(self):
+        items = ["uttut"]
+        if self.maxlen:
+            items.append(f"L{self.maxlen}")
+        if self.vocab_size:
+            items.append(f"V{self.vocab_size}")
+        return pathlib.Path(self.name, "_".join(items))
+
 
 
 class SpecialTokenConfig:
@@ -112,12 +101,6 @@ class SpecialTokenConfig:
         with logging_indent("Special tokens config:"):
             for key, (token, idx) in self._attrs.items():
                 print(f"{key} token: '{token}', index: {idx}.")
-
-
-def _tokenize(s: str) -> list[str]:
-    orig_tokens = s.split()
-    split_tokens = more_itertools.flatten(map(_run_split_on_punc, orig_tokens))
-    return ' '.join(split_tokens).split()
 
 
 def _run_split_on_punc(text: str) -> list[str]:

@@ -15,7 +15,9 @@ import pydantic
 from core.cache import cache_center
 from library.utils import format_path, logging_indent, tqdm_open
 
-from ._config_objects import CorpusConfig, LanguageConfig, SpecialTokenConfig
+from ._config_objects import (
+    CorpusConfig, LanguageConfig, SpecialTokenConfig, WordEmbeddingCollection,
+)
 
 
 class Preprocessor:
@@ -25,28 +27,12 @@ class Preprocessor:
 
     def preprocess(self):
         with logging_indent("Prepare text tokenizer..."):
-
-            def create_tokenizer():
-                if cache_center.root_path:
-                    p = cache_center.root_path / self._cache_dir / 'tokenizer.json'
-                    if p.exists():
-                        with open(p) as f:
-                            return Tokenizer.model_validate_json(f.read())
-
-                print(f'Build text mapper based on corpus data from {format_path(self.corpus_config.path["train"])}')
-                tokenizer = Tokenizer.fit_corpus(self.corpus_config)
-                if cache_center.root_path:
-                    p.parent.mkdir(parents=True, exist_ok=True)
-                    with open(p, 'w') as f:
-                        f.write(tokenizer.model_dump_json(indent=2))
-                return tokenizer
-
-            tokenizer = create_tokenizer()
+            tokenizer = self._create_tokenizer()
 
         with logging_indent("Preprocess text corpus..."):
             data_collection: dict[str, TextDataset] = {}
             for key, path in self.corpus_config.path.items():
-                @cache_center.to_npz(self._cache_dir / f'{key}_data.npz')
+                @cache_center.to_npz(self.corpus_config.cache_path / f'{key}_data.npz')
                 def _process_text_file(filepath):
                     print(f"Load corpus data from {format_path(filepath)}")
                     with tqdm_open(filepath) as f:
@@ -58,17 +44,23 @@ class Preprocessor:
                     text_dataset = TextDataset(ids=ids, texts=texts)
                     data_collection[key] = text_dataset
 
-        metadata = MetaData(tokenizer=tokenizer, cache_dir=self._cache_dir)
+        metadata = MetaData(tokenizer=tokenizer, cache_dir=self.corpus_config.cache_path)
         return data_collection, metadata
 
-    @functools.cached_property
-    def _cache_dir(self):
-        items = ["uttut"]
-        if self.corpus_config.maxlen:
-            items.append(f"L{self.corpus_config.maxlen}")
-        if self.corpus_config.vocab_size:
-            items.append(f"V{self.corpus_config.vocab_size}")
-        return pathlib.Path(self.corpus_config.name, "_".join(items))
+    def _create_tokenizer(self):
+        if cache_center.root_path:
+            p = cache_center.root_path / self.corpus_config.cache_path / 'tokenizer.json'
+            if p.exists():
+                with open(p) as f:
+                    return Tokenizer.model_validate_json(f.read())
+
+        print(f'Build text mapper based on corpus data from {format_path(self.corpus_config.path["train"])}')
+        tokenizer = Tokenizer.fit_corpus(self.corpus_config)
+        if cache_center.root_path:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with open(p, 'w') as f:
+                f.write(tokenizer.model_dump_json(indent=2))
+        return tokenizer
 
 
 @dataclasses.dataclass
@@ -89,8 +81,11 @@ class MetaData:
 
         @cache_center.to_npz(self.cache_dir / 'word_vecs.npz')
         def load_embeddings():
-            word_vec_config = self.tokenizer.language_config.load_pretrained_embeddings_msg()
-            return word_vec_config.get_matrix_of_tokens(self.tokenizer.tokens)
+            language_config = self.tokenizer.language_config
+            print(f"Load pretrained embedding from : {format_path(language_config.embedding_path)}")
+            with open(language_config.embedding_path) as f:
+                wv = WordEmbeddingCollection.model_validate_json(f.read())
+            return wv.get_matrix_of_tokens(self.tokenizer.tokens)
 
         with logging_indent("Load pretrained embeddings:"):
             embeddings = load_embeddings()
