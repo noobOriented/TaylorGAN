@@ -6,37 +6,29 @@ import unicodedata
 
 import more_itertools
 import numpy as np
+import numpy.typing as npt
 import pydantic
-import umsgpack
 
 from library.utils import format_path, logging_indent, tqdm_open
 
 
-class WordEmbeddingCollection:
+class WordEmbeddingCollection(pydantic.BaseModel):
+    token2index: dict[str, int]
+    vectors: list[list[float]]
 
-    UNK = '<unk>'
+    UNK: t.ClassVar = '<unk>'
 
-    def __init__(self, token2index: t.Mapping[str, int], vectors: t.Sequence[t.Sequence[float]]):
-        self.token2index = token2index
-        self.vectors = np.asarray(vectors, np.float32)
-
-    @classmethod
-    def load_msg(cls, path: str | os.PathLike[str]):
-        with open(path, "rb") as f_in:
-            params = umsgpack.unpack(f_in)
-        return cls(token2index=params['token2index'], vectors=params['vector'])
-
-    def get_matrix_of_tokens(self, token_list: t.Sequence[str]) -> npt.NDArray[np.float32]:
-        return np.array([
-            self._get_vector_of_token(token)
-            for token in token_list
-        ])
+    def get_matrix_of_tokens(self, tokens: t.Iterable[str]) -> npt.NDArray[np.float32]:
+        return np.asarray(
+            [self._get_vector_of_token(token) for token in tokens],
+            dtype=np.float32,
+        )
 
     def _get_vector_of_token(self, token: str):
-        if token in self.token2index:
-            return self.vectors[self.token2index[token]]
-        if self.UNK in self.token2index:
-            return self.vectors[self.token2index[self.UNK]]
+        if (index := self.token2index.get(token)) is not None:
+            return self.vectors[index]
+        if (index := self.token2index.get(self.UNK)) is not None:
+            return self.vectors[index]
         return np.zeros_like(self.vectors[0])
 
 
@@ -55,7 +47,8 @@ class LanguageConfig(pydantic.BaseModel):
             raise FileNotFoundError(f"invalid embedding_path: {self.embedding_path}")
 
         print(f"Load pretrained embedding from : {format_path(self.embedding_path)}")
-        return WordEmbeddingCollection.load_msg(self.embedding_path)
+        with open(self.embedding_path) as f:
+            return WordEmbeddingCollection.model_validate_json(f.read())
 
     def get_config(self):
         return self.model_dump(mode='json')

@@ -27,16 +27,18 @@ class Preprocessor:
         with logging_indent("Prepare text tokenizer..."):
 
             def create_tokenizer():
-                p = self._cache_dir / 'tokenizer.json'
-                if p.exists():
-                    with open(p) as f:
-                        return Tokenizer.model_validate_json(f.read())
+                if cache_center.root_path:
+                    p = cache_center.root_path / self._cache_dir / 'tokenizer.json'
+                    if p.exists():
+                        with open(p) as f:
+                            return Tokenizer.model_validate_json(f.read())
 
                 print(f'Build text mapper based on corpus data from {format_path(self.corpus_config.path["train"])}')
                 tokenizer = Tokenizer.fit_corpus(self.corpus_config)
-                self._cache_dir.mkdir(parents=True, exist_ok=True)
-                with open(p, 'w') as f:
-                    f.write(tokenizer.model_dump_json(indent=2))
+                if cache_center.root_path:
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    with open(p, 'w') as f:
+                        f.write(tokenizer.model_dump_json(indent=2))
                 return tokenizer
 
             tokenizer = create_tokenizer()
@@ -52,7 +54,7 @@ class Preprocessor:
 
                 with logging_indent(f"{key} data:", bullet=False):
                     ids = _process_text_file(path)
-                    texts = list(map(tokenizer.ids_to_text, ids))
+                    texts = [tokenizer.ids_to_text(idx) for idx in ids]
                     text_dataset = TextDataset(ids=ids, texts=texts)
                     data_collection[key] = text_dataset
 

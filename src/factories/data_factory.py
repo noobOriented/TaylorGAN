@@ -18,7 +18,7 @@ LANGUAGE_CONFIGS = {
         split_token=' ',
     ),
     'test': LanguageConfig(
-        embedding_path='datasets/en_fasttext_word2vec_V100D20.msg',
+        embedding_path='datasets/en_fasttext_word2vec_V100D20.json',
         split_token=' ',
     ),
 }
