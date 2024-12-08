@@ -41,7 +41,7 @@ def main():
     )
     args = parser.parse_args()
 
-    restore_path = args.path
+    restore_path: pathlib.Path = args.path
     main_args_path = restore_path / 'args'
     try:
         with open(main_args_path, 'r') as f_in:
@@ -54,7 +54,7 @@ def main():
     main_args.__dict__.update(args.__dict__)
     train.main(
         main_args,
-        base_tag=os.path.basename(restore_path),
+        base_tag=restore_path.name,
         checkpoint=ModelCheckpointSaver.latest_checkpoint(restore_path),
     )
 

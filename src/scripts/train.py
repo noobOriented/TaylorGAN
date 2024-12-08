@@ -43,8 +43,10 @@ def main(
             data=preprocessed_result,
             generator=generator,
             trainer=trainer,
+            checkpoint=checkpoint,
             base_tag=base_tag,
         )
+        callback.summary()
 
     data_loader = DataLoader(
         dataset=preprocessed_result.dataset['train'].ids,

@@ -5,7 +5,7 @@ import typing as t
 import more_itertools
 import numpy.typing as npt
 
-from core.train.pubsub import Event
+from core.train.pubsub import EventHook
 from library.utils import batch_generator, format_highlight
 
 
@@ -33,7 +33,7 @@ class DataLoader:
         self._epoch += epochs
 
     def __iter__(self) -> t.Iterator[npt.NDArray]:
-        self.callback.on_train_begin(self._epoch > 1)
+        self.callback.on_train_begin()
         print(format_highlight("Start Training"))
         while self._epoch <= self.n_epochs:
             self.callback.on_epoch_begin(self._epoch)
@@ -58,9 +58,13 @@ class DataLoader:
 
 class Callback:
     def __init__(self) -> None:
-        self.on_train_begin = Event[bool]()
-        self.on_epoch_begin = Event[int]()
-        self.on_batch_begin = Event[int]()
-        self.on_batch_end = Event[int, npt.NDArray]()
-        self.on_epoch_end = Event[int]()
-        self.on_train_end = Event[()]()
+        self.on_train_begin = EventHook[()]()
+        self.on_epoch_begin = EventHook[int]()
+        self.on_batch_begin = EventHook[int]()
+        self.on_batch_end = EventHook[int, npt.NDArray]()
+        self.on_epoch_end = EventHook[int]()
+        self.on_train_end = EventHook[()]()
+
+    def summary(self):
+        # TODO list all hooks and their period
+        ...
