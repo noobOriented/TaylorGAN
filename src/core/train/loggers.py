@@ -9,7 +9,7 @@ from library.utils import (
     SEPARATION_LINE, ExponentialMovingAverageMeter, TqdmRedirector, format_highlight2, left_aligned,
 )
 
-from .pubsub import CHANNELS
+from .pubsub import METRIC_CHANNELS
 
 
 class ProgbarLogger:
@@ -29,7 +29,7 @@ class ProgbarLogger:
             pbar.format_meter = _format_meter_for_losses
             ema_meter = ExponentialMovingAverageMeter(decay=0.9)
 
-            @updater.attach_subscriber
+            @updater.hook.attach
             def update_losses(step, losses, pbar=pbar, ema_meter=ema_meter):
                 if step > pbar.n:
                     pbar.update(step - pbar.n)
@@ -37,12 +37,12 @@ class ProgbarLogger:
 
         self._add_bar(bar_format=SEPARATION_LINE)
 
-        for channel, m_aligned in zip(CHANNELS.values(), left_aligned(CHANNELS.keys())):
+        for channel, m_aligned in zip(METRIC_CHANNELS.values(), left_aligned(METRIC_CHANNELS.keys())):
             pbar = self._add_bar(desc=m_aligned)
             pbar.format_meter = _format_meter_for_metrics
             ema_meter = ExponentialMovingAverageMeter(decay=0.)  # to persist logged values
 
-            @channel.attach_subscriber
+            @channel.attach
             def update_metrics(step, vals, pbar=pbar, ema_meter=ema_meter):
                 pbar.set_postfix(ema_meter.apply(**vals))
 
@@ -66,8 +66,8 @@ class ProgbarLogger:
         self._bars.pop().close()
 
     def on_train_end(self):
-        for bar in self._bars:
-            bar.close()
+        for b in self._bars:
+            b.close()
         TqdmRedirector.disable()
 
     def _add_bar(self, **kwargs):
