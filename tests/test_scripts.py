@@ -25,7 +25,7 @@ def checkpoint_root(tmp_path_factory: pytest.TempPathFactory):
 @pytest.fixture(scope='session', autouse=True)
 def redirect_cache_root(cache_root_dir):
     from core.cache import cache_center
-    cache_center.root_path = str(cache_root_dir)
+    cache_center.root_path = cache_root_dir
 
 
 @pytest.fixture(autouse=True)

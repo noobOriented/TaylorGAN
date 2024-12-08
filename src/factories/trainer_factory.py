@@ -17,7 +17,7 @@ from core.objectives.regularizers import (
     EmbeddingRegularizer, EntropyRegularizer, GradientPenaltyRegularizer,
     LossScaler, SpectralRegularizer, WordVectorRegularizer,
 )
-from core.preprocess import MetaData
+from core.preprocess import PreprocessResult
 from core.train import DiscriminatorUpdater, GANTrainer, GeneratorUpdater, NonParametrizedTrainer
 from core.train.optimizer import OptimizerWrapper
 from library.torch_zoo.nn import LambdaModule, activations
@@ -32,7 +32,7 @@ class MLEObjectiveConfigs(pydantic.BaseModel):
     g_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
     g_regularizers: list[str] = []
 
-    def get_trainer(self, metadata: MetaData, generator: Generator):
+    def get_trainer(self, data: PreprocessResult, generator: Generator):
         generator_updater = GeneratorUpdater(
             generator,
             optimizer=_OPTIMIZERS(self.g_optimizer)(generator.trainable_variables),
@@ -54,8 +54,8 @@ class GANObjectiveConfigs(pydantic.BaseModel):
     loss: t.Annotated[str, pydantic.Field(description='loss function pair of GAN.')] = 'RKL'
     estimator: t.Annotated[str, pydantic.Field(description='gradient estimator for discrete sampling.')] = 'taylor'
 
-    def get_trainer(self, metadata: MetaData, generator: Generator):
-        discriminator = self._create_discriminator(metadata)
+    def get_trainer(self, data: PreprocessResult, generator: Generator):
+        discriminator = self._create_discriminator(data)
         objective = GANObjective(
             discriminator=discriminator,
             generator_loss=self._loss_tuple.generator_loss,
@@ -76,12 +76,13 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             d_steps=self.d_steps,
         )
 
-    def _create_discriminator(self, metadata: MetaData) -> Discriminator:
+    def _create_discriminator(self, data: PreprocessResult) -> Discriminator:
         print(f"Create discriminator: {self.discriminator}")
-        network_func, arginfo = _D_MODELS(self.discriminator, return_info=True)
+        network_func = _D_MODELS(self.discriminator)
         embedder = Embedding.from_pretrained(
-            torch.from_numpy(metadata.load_pretrained_embeddings()),
+            torch.from_numpy(data.load_pretrained_embeddings()),
             freeze=self.d_fix_embeddings,
+            padding_idx=data.tokenizer.special_tokens.pad.idx,
         )
         return Discriminator(
             network=network_func(embedder.embedding_dim),

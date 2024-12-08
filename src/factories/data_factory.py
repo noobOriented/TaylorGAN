@@ -5,7 +5,7 @@ import pydantic
 import yaml
 
 from core.cache import cache_center
-from core.preprocess import CorpusConfig, MetaData, TextDataset, Tokenizer
+from core.preprocess import CorpusConfig, PreprocessResult, TextDataset, Tokenizer
 from library.utils import format_id, format_path, logging_indent, tqdm_open
 
 
@@ -20,7 +20,7 @@ class DataConfigs(pydantic.BaseModel):
         pydantic.Field(ge=1, description='the maximum number of tokens. ordered by descending frequency.'),
     ] = None
 
-    def load_data(self) -> tuple[dict[str, TextDataset], MetaData]:
+    def load_data(self) -> PreprocessResult:
         print(f"data_id: {format_id(self.dataset)}")
 
         with logging_indent("Prepare text tokenizer..."):
@@ -29,7 +29,7 @@ class DataConfigs(pydantic.BaseModel):
         with logging_indent("Preprocess text corpus..."):
             data_collection: dict[str, TextDataset] = {}
             for key, path in self._corpus_config.path.items():
-                @cache_center.to_npz(self._corpus_config.cache_path / f'{key}_data.npz')
+                @cache_center.to_npz(self._cache_key, f'{key}_data.npz')
                 def _process_text_file(filepath):
                     print(f"Load corpus data from {format_path(filepath)}")
                     with tqdm_open(filepath) as f:
@@ -40,26 +40,24 @@ class DataConfigs(pydantic.BaseModel):
                     texts = [tokenizer.ids_to_text(idx) for idx in ids]
                     data_collection[key] = TextDataset(ids=ids, texts=texts)
 
-        metadata = MetaData(
+        return PreprocessResult(
+            dataset=data_collection,
             tokenizer=tokenizer,
             embedding_path=self._corpus_config.embedding_path,
-            cache_dir=self._corpus_config.cache_path,
+            cache_key=self._cache_key,
         )
-        return data_collection, metadata
 
     def _create_tokenizer(self):
-        if cache_center.root_path:
-            p = cache_center.root_path / self._corpus_config.cache_path / 'tokenizer.json'
-            if p.exists():
-                with open(p) as f:
-                    return Tokenizer.model_validate_json(f.read())
+        p = cache_center.root_path / self._cache_key / 'tokenizer.json'
+        if p.exists():
+            with open(p) as f:
+                return Tokenizer.model_validate_json(f.read())
 
         print(f'Build text mapper based on corpus data from {format_path(self._corpus_config.path["train"])}')
         tokenizer = Tokenizer.fit_corpus(self._corpus_config)
-        if cache_center.root_path:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            with open(p, 'w') as f:
-                f.write(tokenizer.model_dump_json(indent=2))
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(p, 'w') as f:
+            f.write(tokenizer.model_dump_json(indent=2))
         return tokenizer
 
     @functools.cached_property
@@ -72,3 +70,12 @@ class DataConfigs(pydantic.BaseModel):
         if not ('train' in c.path and all(p.exists() for p in c.path.values())):
             raise KeyError  # TODO else warning?
         return c
+
+    @functools.cached_property
+    def _cache_key(self) -> str:
+        key = self.dataset
+        if self.maxlen:
+            key += f'_L{self.maxlen}'
+        if self.vocab_size:
+            key += f'_V{self.vocab_size}'
+        return key

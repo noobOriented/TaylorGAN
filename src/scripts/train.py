@@ -21,23 +21,19 @@ def main(configs: GANTrainingConfigs | MLETrainingConfigs, base_tag=None, checkp
         set_global_random_seed(configs.random_seed)
 
     with logging_indent("Preprocess data"):
-        data_collection, metadata = configs.load_data()
-        with logging_indent("Data summary:"):
-            for key, array in data_collection.items():
-                print(f"{key} data contains {len(array)} sentences.")
-
-        metadata.tokenizer.summary()
+        preprocessed_result = configs.load_data()
+        preprocessed_result.summary()
 
     with logging_indent("Prepare Generator"):
-        generator = configs.get_generator(metadata)
+        generator = configs.get_generator(preprocessed_result)
 
     with logging_indent("Prepare Generator Trainer"):
-        trainer = configs.get_trainer(metadata, generator)
+        trainer = configs.get_trainer(preprocessed_result, generator)
         trainer.summary()
 
     with logging_indent("Prepare Callback"):
         data_loader = DataLoader(
-            data_collection['train'],
+            preprocessed_result.dataset['train'],
             batch_size=configs.batch_size,
             n_epochs=configs.epochs,
         )
@@ -45,8 +41,7 @@ def main(configs: GANTrainingConfigs | MLETrainingConfigs, base_tag=None, checkp
             configs,
             trainer=trainer,
             generator=generator,
-            data_collection=data_collection,
-            metadata=metadata,
+            data=preprocessed_result,
             base_tag=base_tag,
         )
 

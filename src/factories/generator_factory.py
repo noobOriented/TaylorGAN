@@ -6,7 +6,7 @@ import torch
 from torch.nn import Embedding, GRUCell, Linear, Sequential
 
 from core.models import AutoRegressiveGenerator, Generator
-from core.preprocess import MetaData
+from core.preprocess import PreprocessResult
 from library.utils import LookUpCall
 
 
@@ -18,11 +18,14 @@ class GeneratorConfigs(pydantic.BaseModel):
     ] = False
     g_fix_embeddings: bool = False
 
-    def get_generator(self, metadata: MetaData) -> Generator:
+    def get_generator(self, data: PreprocessResult) -> Generator:
         print(f"Create generator: {self.generator}")
 
-        embedding_matrix = torch.from_numpy(metadata.load_pretrained_embeddings())
-        embedder = Embedding.from_pretrained(embedding_matrix, freeze=self.g_fix_embeddings)
+        embedder = Embedding.from_pretrained(
+            torch.from_numpy(data.load_pretrained_embeddings()),
+            padding_idx=data.tokenizer.special_tokens.pad.idx,
+            freeze=self.g_fix_embeddings,
+        )
         presoftmax_layer = Linear(embedder.embedding_dim, embedder.num_embeddings)
         if self.tie_embeddings:
             presoftmax_layer.weight = embedder.weight
@@ -37,7 +40,7 @@ class GeneratorConfigs(pydantic.BaseModel):
                 Linear(cell.hidden_size, embedder.embedding_dim, bias=False),
                 presoftmax_layer,
             ),
-            special_token_config=metadata.tokenizer.special_token_config,
+            special_token_config=data.tokenizer.special_tokens,
         )
 
 

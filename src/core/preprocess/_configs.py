@@ -49,16 +49,6 @@ class CorpusConfig(pydantic.BaseModel):
             for s in it:
                 yield self.segmentor.segmentize_text(s)
 
-    @property
-    def cache_path(self):
-        items = ["uttut"]
-        if self.maxlen:
-            items.append(f"L{self.maxlen}")
-        if self.vocab_size:
-            items.append(f"V{self.vocab_size}")
-        return pathlib.Path(self.name, "_".join(items))
-
-
 
 class SpecialTokenConfig:
 

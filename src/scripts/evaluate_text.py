@@ -20,21 +20,21 @@ def main():
         fed: int | None = None
 
     args = parse_args_as(Args)
-    data_collection, metadata = args.load_data()
-    tokenizer = metadata.tokenizer
+    preprocessed_result = args.load_data()
+    tokenizer = preprocessed_result.tokenizer
 
     metric_calcuators = []
     if args.bleu:
         metric_calcuators.append(
             BLEUMetrics(
-                data_collection,
+                preprocessed_result.dataset,
                 max_gram=args.bleu,
                 eos_idx=tokenizer.eos_idx,
-                cache_dir=metadata.cache_dir,
+                cache_dir=preprocessed_result.cache_key,
             ),
         )
     if args.fed:
-        metric_calcuators.append(FEDMetrics(data_collection, tokenizer, sample_size=args.fed))
+        metric_calcuators.append(FEDMetrics(preprocessed_result.dataset, tokenizer, sample_size=args.fed))
 
     with open(args.eval_path, 'r') as f:
         texts = [line.rstrip() for line in f.readlines()]
@@ -60,7 +60,7 @@ class BLEUMetrics:
                 max_gram=max_gram,
                 eos_idx=eos_idx,
                 smoothing=SmoothingFunction.fuzz_smoothing,
-                cache_dir=cache_dir / f"{tag}_BLEU" if cache_dir else None,
+                cache_dir=pathlib.Path(cache_dir, f'{tag}_BLEU') if cache_dir else None,
                 verbose=True,
             )
             for tag, dataset in data_collection.items()

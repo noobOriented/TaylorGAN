@@ -1,3 +1,3 @@
 from ._configs import CorpusConfig, SpecialTokenConfig
-from ._preprocessors import MetaData, TextDataset, Tokenizer
+from ._preprocessors import PreprocessResult, TextDataset, Tokenizer
 from ._segmentor import Segmentor

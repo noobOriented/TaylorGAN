@@ -7,20 +7,14 @@ from library.utils import NumpyCache, PickleCache
 
 class CacheCenter:
 
-    def __init__(self, root_path: str | os.PathLike[str] | None):
-        self.root_path = root_path
+    def __init__(self, root_path: str | os.PathLike[str]):
+        self.root_path = pathlib.Path(root_path)
 
     def to_file(self, *path, cacher):
-        if self.root_path and all(path):
-            return cacher.tofile(os.path.join(self.root_path, *path))
-        return _null_decorator
+        return cacher.tofile(os.path.join(self.root_path, *path))
 
     to_npz = functools.partialmethod(to_file, cacher=NumpyCache)
     to_pkl = functools.partialmethod(to_file, cacher=PickleCache)
-
-
-def _null_decorator(func):
-    return func
 
 
 cache_root_dir = pathlib.Path(__file__).parents[2] / '.cache'

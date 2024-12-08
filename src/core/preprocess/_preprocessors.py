@@ -28,14 +28,15 @@ class TextDataset:
 
 
 @dataclasses.dataclass
-class MetaData:
+class PreprocessResult:
+    dataset: dict[str, TextDataset]
     tokenizer: Tokenizer
     embedding_path: pathlib.Path
-    cache_dir: pathlib.Path
+    cache_key: str
 
     def load_pretrained_embeddings(self) -> npt.NDArray[np.floating]:
 
-        @cache_center.to_npz(self.cache_dir / 'word_vecs.npz')
+        @cache_center.to_npz(self.cache_key, 'word_vecs.npz')
         def load_embeddings():
             print(f"Load pretrained embedding from : {format_path(self.embedding_path)}")
             with open(self.embedding_path) as f:
@@ -48,19 +49,26 @@ class MetaData:
 
         return embeddings
 
+    def summary(self):
+        with logging_indent("Data summary:"):
+            for key, array in self.dataset.items():
+                print(f"{key} data contains {len(array)} sentences.")
+
+        self.tokenizer.summary()
+
 
 class Tokenizer(pydantic.BaseModel):
     tokens: list[str]
     segmentor: Segmentor
     maxlen: int
 
-    special_token_config: t.ClassVar = SpecialTokenConfig(
+    special_tokens: t.ClassVar = SpecialTokenConfig(
         sos='<sos>',
         eos='</s>',
         pad='<pad>',
         unk='<unk>',
     )
-    eos_idx: t.ClassVar[int] = special_token_config.eos.idx
+    eos_idx: t.ClassVar[int] = special_tokens.eos.idx
 
     def texts_to_array(self, texts: t.Iterable[str]) -> npt.NDArray[np.int32]:
         return np.asarray(
@@ -70,10 +78,10 @@ class Tokenizer(pydantic.BaseModel):
 
     def text_to_ids(self, text: str) -> list[int]:
         tokens = self.segmentor.segmentize_text(text)
-        tokens.append(self.special_token_config.eos.token)
-        tokens = more_itertools.padded(tokens, self.special_token_config.pad.token)
+        tokens.append(self.special_tokens.eos.token)
+        tokens = more_itertools.padded(tokens, self.special_tokens.pad.token)
         tokens = more_itertools.take(self.maxlen, tokens)
-        unk_idx = self.special_token_config.unk.idx
+        unk_idx = self.special_tokens.unk.idx
         return [self._token2index.get(s, unk_idx) for s in tokens]
 
     def ids_to_text(self, ids: t.Sequence[int]) -> str:
@@ -95,7 +103,7 @@ class Tokenizer(pydantic.BaseModel):
             token_freq, maxlen = _get_freq_and_maxlen(corpus_config.iter_train_sentences())
 
         all_tokens = more_itertools.unique_everseen(itertools.chain(
-            cls.special_token_config.tokens,
+            cls.special_tokens.tokens,
             [token for token, _ in token_freq.most_common()],
         ))
         tokens = more_itertools.take(vocab_size, all_tokens) if vocab_size else list(all_tokens)
@@ -109,7 +117,7 @@ class Tokenizer(pydantic.BaseModel):
         with logging_indent(f"{self.__class__.__name__} summary:"):
             print(f"Maxlen: {self.maxlen}.")
             print(f"Vocabulary size: {len(self.tokens)}.")
-            self.special_token_config.summary()
+            self.special_tokens.summary()
 
     @functools.cached_property
     def _token2index(self):
