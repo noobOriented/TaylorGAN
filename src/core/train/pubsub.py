@@ -1,6 +1,15 @@
+from __future__ import annotations
+
 import abc
 import numbers
 import typing as t
+
+
+CHANNELS: dict[str, Channel] = {}
+
+
+def register_channel(key: str) -> Channel:
+    return CHANNELS.setdefault(key, Channel())
 
 
 class Subscriber(t.Protocol):
@@ -10,7 +19,7 @@ class Subscriber(t.Protocol):
         ...
 
 
-class Subject:
+class Channel:
 
     def __init__(self):
         self._subscribers: list[Subscriber] = []

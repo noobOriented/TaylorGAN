@@ -8,10 +8,10 @@ from core.objectives.collections import LossCollection
 from library.utils import logging_indent, reuse_method_call
 
 from .optimizer import OptimizerWrapper
-from .pubsub_base import Subject
+from .pubsub import Channel
 
 
-class ModuleUpdater(Subject):
+class ModuleUpdater(Channel):
 
     def __init__(
         self,

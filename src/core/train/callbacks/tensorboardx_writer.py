@@ -7,8 +7,8 @@ from tensorboardX import SummaryWriter
 
 from library.utils import format_path
 
+from ..pubsub import CHANNELS
 from .base import Callback
-from .channels import channels
 
 
 class TensorBoardXWritter(Callback):
@@ -35,7 +35,7 @@ class TensorBoardXWritter(Callback):
                 ),
             )
 
-        for name, channel in channels.items():
+        for name, channel in CHANNELS.items():
             channel.attach_subscriber(MetricsWriter(
                 self.writer,
                 tag_template=os.path.join(name, '{key}'),

@@ -4,8 +4,8 @@ from functools import partialmethod
 from core.evaluate import TextGenerator
 from library.utils import logging_indent, reuse_method_call
 
+from ..pubsub import Channel
 from .base import Callback
-from .channels import Subject
 
 
 class TextEvaluator(Callback):
@@ -37,7 +37,7 @@ class EvaluateCommander:
         evaluator: t.Callable,
         sample_size: int,
         on_text: bool,
-        channel: Subject | None = None,
+        channel: Channel | None = None,
         period: int = 1,
     ):
         def command(generator: TextGenerator, step):  # late bind generator to allow cache

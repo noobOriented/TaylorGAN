@@ -8,8 +8,8 @@ from core.train.updaters import ModuleUpdater
 from library.utils import ExponentialMovingAverageMeter, format_highlight2, left_aligned
 from library.utils.logging import SEPARATION_LINE, TqdmRedirector
 
+from ..pubsub import CHANNELS
 from .base import Callback
-from .channels import channels
 
 
 class _Bar(t.Protocol):
@@ -37,7 +37,7 @@ class ProgbarLogger(Callback):
 
         self._add_bar(bar_format=SEPARATION_LINE)
 
-        for channel, m_aligned in zip(channels.values(), left_aligned(channels.keys())):
+        for channel, m_aligned in zip(CHANNELS.values(), left_aligned(CHANNELS.keys())):
             channel.attach_subscriber(self._add_bar(_MetricsBar, desc=m_aligned))
 
         self._add_bar(bar_format=SEPARATION_LINE)

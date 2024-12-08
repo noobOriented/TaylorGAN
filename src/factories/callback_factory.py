@@ -16,7 +16,7 @@ from core.train.callbacks import (
     Callback, CallbackList, ModelCheckpoint, ModelSaver,
     ProgbarLogger, TensorBoardXWritter, TextEvaluator, TrainProfiler,
 )
-from core.train.callbacks.channels import register_channel
+from core.train.pubsub import register_channel
 from core.train.trainers import Trainer
 from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
 
