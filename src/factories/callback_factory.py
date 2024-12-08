@@ -13,6 +13,7 @@ from core.train.callbacks import (
     BLEUEvaluator, Callback, CallbackList, FEDEvaluator, ModelCheckpoint,
     ModelSaver, ProgbarLogger, TensorBoardXWritter, TextEvaluator, TrainProfiler,
 )
+from core.train.fit_loop import DataLoader
 from core.train.trainers import Trainer
 
 
@@ -21,18 +22,24 @@ def create(
     trainer: Trainer,
     generator: Generator,
     data: PreprocessResult,
+    data_loader: DataLoader,
     base_tag: str | None = None,
-) -> Callback:
+):
     creator = _CallbackCreator(
         args,
         data=data,
         generator=generator,
         trainer=trainer,
         base_tag=base_tag,
+        data_loader=data_loader,
     )
-    cbk = CallbackList(list(creator.create_callbacks()))
-    cbk.summary()
-    return cbk
+    for cbk in creator.create_callbacks():
+        data_loader._callback.on_train_begin.attach(cbk.on_train_begin)
+        data_loader._callback.on_epoch_begin.attach(cbk.on_epoch_begin)
+        data_loader._callback.on_batch_begin.attach(cbk.on_batch_begin)
+        data_loader._callback.on_batch_end.attach(cbk.on_batch_end)
+        data_loader._callback.on_epoch_end.attach(cbk.on_epoch_end)
+        data_loader._callback.on_train_end.attach(cbk.on_train_end)
 
 
 class _Args(t.Protocol):
@@ -64,6 +71,7 @@ class _CallbackCreator:
         generator: Generator,
         trainer: Trainer,
         data: PreprocessResult,
+        data_loader: DataLoader,
         base_tag: str | None = None,
     ):
         self.args = args

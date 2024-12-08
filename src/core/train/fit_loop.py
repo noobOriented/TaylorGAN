@@ -5,8 +5,6 @@ import numpy.typing as npt
 
 from library.utils import batch_generator, format_highlight
 
-from .callbacks import Callback, NullCallback
-
 
 class DataLoader:
 
@@ -15,13 +13,12 @@ class DataLoader:
         dataset: npt.NDArray,
         batch_size: int,
         n_epochs: int,
-        callback: Callback | None = None,
     ):
         self.dataset = dataset
         self.batch_size = batch_size
         self.n_epochs = n_epochs
 
-        self._callback = callback or NullCallback()
+        self._callback = CustomCallback()
         self._batch = 0
         self._epoch = 1
 
@@ -32,7 +29,7 @@ class DataLoader:
         self._epoch += epochs
 
     def __iter__(self) -> t.Iterator[npt.NDArray]:
-        self._callback.on_train_begin(is_restored=self._epoch > 1)
+        self._callback.on_train_begin(self._epoch > 1)
         print(format_highlight("Start Training"))
         while self._epoch <= self.n_epochs:
             self._callback.on_epoch_begin(self._epoch)
@@ -53,3 +50,27 @@ class DataLoader:
             batch_size=self.batch_size,
             shuffle=True,
         )
+
+
+class CustomCallback:
+    def __init__(self) -> None:
+        self.on_train_begin = Event[bool]()
+        self.on_epoch_begin = Event[int]()
+        self.on_batch_begin = Event[int]()
+        self.on_batch_end = Event[int, npt.NDArray]()
+        self.on_epoch_end = Event[int]()
+        self.on_train_end = Event[()]()
+
+
+class Event[*T]:
+
+    def __init__(self) -> None:
+        self._hooks: list[t.Callable[[*T], t.Any]] = []
+
+    def __call__(self, *args: *T) -> None:
+        for f in self._hooks:
+            f(*args)
+
+    def attach(self, f: t.Callable[[*T], t.Any], /):
+        self._hooks.append(f)
+        return f

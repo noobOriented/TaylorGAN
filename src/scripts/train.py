@@ -38,21 +38,21 @@ def main(
         trainer = configs.get_trainer(preprocessed_result, generator)
         trainer.summary()
 
+    data_loader = DataLoader(
+        dataset=preprocessed_result.dataset['train'].ids,
+        batch_size=configs.batch_size,
+        n_epochs=configs.epochs,
+    )
     with logging_indent("Prepare Callback"):
-        callback = callback_factory.create(
+        callback_factory.create(
             configs,
             data=preprocessed_result,
+            data_loader=data_loader,
             generator=generator,
             trainer=trainer,
             base_tag=base_tag,
         )
 
-    data_loader = DataLoader(
-        dataset=preprocessed_result.dataset['train'].ids,
-        batch_size=configs.batch_size,
-        n_epochs=configs.epochs,
-        callback=callback,
-    )
     if checkpoint:
         print(f"Restore from checkpoint: {checkpoint}")
         trainer.load_state(path=checkpoint)

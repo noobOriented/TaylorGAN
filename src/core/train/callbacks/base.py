@@ -5,7 +5,7 @@ from library.utils import FormatableMixin
 
 class Callback(FormatableMixin):
 
-    def on_train_begin(self, is_restored: bool):
+    def on_train_begin(self, is_restored: bool, /):
         pass
 
     def on_epoch_begin(self, epoch: int, /):

@@ -26,7 +26,7 @@ class TrainProfiler(Callback):
         self.export_filepath = export_filepath
         self.stop_training_when_finish = stop_training_when_finish
 
-    def on_train_begin(self):
+    def on_train_begin(self, _):
         self.profile = cProfile.Profile(subcalls=False)
 
     def on_batch_begin(self, batch: int):
