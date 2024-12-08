@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections
 import os
 import pathlib
 import sys
@@ -15,9 +16,8 @@ import torch
 from core.evaluate import TextGenerator
 from core.models.generators import Generator
 from core.preprocess import PreprocessResult
-from core.train import Callback, ModelCheckpointSaver, Trainer
+from core.train import Callback, EventHook, ModelCheckpointSaver, Trainer
 from core.train.loggers import ProgbarLogger
-from core.train.pubsub import METRIC_CHANNELS, register_channel
 from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
 
 
@@ -93,6 +93,7 @@ class _CallbackCreator:
         base_tag = base_tag or f"{data.cache_key}@{time.strftime('%Y%m%d-%H%M%S')}"
         self.tag = pathlib.Path(*self.args.tags, base_tag)
         self.text_generator = TextGenerator(self.generator, tokenizer=self.data.tokenizer)
+        self.metric_channels = collections.defaultdict(EventHook[int, t.Mapping[str, float]])
 
     def attach_events(self):
         self._attach_evaluators()
@@ -130,14 +131,14 @@ class _CallbackCreator:
 
     def _attach_evaluators(self):
 
-        @self.callback.on_batch_end.attach
-        def calculate_mean_length(batch: int, _, hook=register_channel('samples')):
+        @self.trainer.generator_updater.hook.attach
+        def calculate_mean_length(batch: int, _, hook=self.metric_channels['samples']):
             if batch % 10 == 0:
                 ids = self.text_generator.generate_ids(10)
                 mean_length = np.mean(get_seqlens(ids, self.data.special_tokens.EOS.idx))
                 hook(batch, {'mean_length': float(mean_length)})
 
-        @self.callback.on_batch_end.attach
+        @self.trainer.generator_updater.hook.attach
         def log_texts(batch: int, _):
             if batch % 100 == 0:
                 sentences = self.text_generator.generate_texts(3)
@@ -164,15 +165,15 @@ class _CallbackCreator:
                         smoothing=SmoothingFunction.fuzz_smoothing,
                     )
 
-                @self.callback.on_batch_end.attach
-                def bleu(batch: int, _, /, calculator=calculator, hook=register_channel(tag)):
+                @self.trainer.generator_updater.hook.attach
+                def bleu(batch: int, _, /, calculator=calculator, hook=self.metric_channels[tag]):
                     if batch % 10 == 0:
                         ids = self.text_generator.generate_ids(self.args.batch_size)
                         result = calculator.mean_bleu(ids)
                         hook(batch, result)
 
             @self.callback.on_epoch_end.attach
-            def self_bleu(epoch: int, hook=register_channel('samples')):
+            def self_bleu(epoch: int, hook=self.metric_channels['samples']):
                 ids = self.text_generator.generate_ids(len(self.data.dataset['train']))
 
                 print("Evaluating generated data SelfBLEU...")
@@ -196,7 +197,7 @@ class _CallbackCreator:
                 )
 
                 @self.callback.on_epoch_end.attach
-                def fed(epoch: int, calculator=calculator, hook=register_channel(tag)):
+                def fed(epoch: int, calculator=calculator, hook=self.metric_channels[tag]):
                     texts = self.generator.generate_texts(fed_sample_size)
                     d = {'FED': calculator.calculate_fed_score(texts)}
                     hook(epoch, d)
@@ -205,7 +206,11 @@ class _CallbackCreator:
         bar = ProgbarLogger(
             desc=str(self.tag),
             total=len(self.data.dataset['train']),
-            updaters=self.trainer.updaters,
+            module_update_hooks={
+                u.info: u.hook
+                for u in self.trainer.updaters
+            },
+            metric_update_hooks=self.metric_channels,
         )
         self.callback.on_train_begin.attach(bar.on_train_begin)
         self.callback.on_epoch_begin.attach(bar.on_epoch_begin)
@@ -239,7 +244,7 @@ class _CallbackCreator:
                                 global_step=step,  # TODO enerator step?
                             )
 
-            for name, channel in METRIC_CHANNELS.items():
+            for name, channel in self.metric_channels.items():
                 @channel.attach
                 def update_metrics(step: int, vals: t.Mapping):
                     for key, val in vals.items():

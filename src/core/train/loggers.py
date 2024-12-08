@@ -4,32 +4,38 @@ import typing as t
 
 import tqdm
 
-from core.train.updaters import ModuleUpdater
 from library.utils import (
     SEPARATION_LINE, ExponentialMovingAverageMeter, TqdmRedirector, format_highlight2, left_aligned,
 )
 
-from .pubsub import METRIC_CHANNELS
+from .pubsub import EventHook
 
 
 class ProgbarLogger:
 
-    def __init__(self, desc: str, total: int, updaters: t.Sequence[ModuleUpdater]):
+    def __init__(
+        self,
+        desc: str,
+        total: int,
+        module_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]] | None = None,
+        metric_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]] | None = None,
+    ):
         self.desc = format_highlight2(desc)
         self.total = total
-        self._updaters = updaters
+        self._module_hooks = module_update_hooks or {}
+        self._metric_hooks = metric_update_hooks or {}
         self._bars: list[tqdm.tqdm] = []
 
     def on_train_begin(self):
         TqdmRedirector.enable()
         self._add_bar(bar_format=SEPARATION_LINE)
         self._header = self._add_bar(bar_format="{desc}: {elapsed}", desc=self.desc)
-        for updater in self._updaters:
-            pbar = self._add_bar(desc=updater.info)
+        for name, hook in self._module_hooks.items():
+            pbar = self._add_bar(desc=name)
             pbar.format_meter = _format_meter_for_losses
             ema_meter = ExponentialMovingAverageMeter(decay=0.9)
 
-            @updater.hook.attach
+            @hook.attach
             def update_losses(step, losses, pbar=pbar, ema_meter=ema_meter):
                 if step > pbar.n:
                     pbar.update(step - pbar.n)
@@ -37,12 +43,15 @@ class ProgbarLogger:
 
         self._add_bar(bar_format=SEPARATION_LINE)
 
-        for channel, m_aligned in zip(METRIC_CHANNELS.values(), left_aligned(METRIC_CHANNELS.keys())):
+        for m_aligned, hook in zip(
+            left_aligned(self._metric_hooks.keys()),
+            self._metric_hooks.values(),
+        ):
             pbar = self._add_bar(desc=m_aligned)
             pbar.format_meter = _format_meter_for_metrics
             ema_meter = ExponentialMovingAverageMeter(decay=0.)  # to persist logged values
 
-            @channel.attach
+            @hook.attach
             def update_metrics(step, vals, pbar=pbar, ema_meter=ema_meter):
                 pbar.set_postfix(ema_meter.apply(**vals))
 

@@ -3,13 +3,6 @@ from __future__ import annotations
 import typing as t
 
 
-METRIC_CHANNELS: dict[str, EventHook[int, t.Mapping[str, float]]] = {}
-
-
-def register_channel(key: str) -> EventHook[int, t.Mapping[str, float]]:
-    return METRIC_CHANNELS.setdefault(key, EventHook())
-
-
 class EventHook[*T]:
 
     def __init__(self) -> None:
