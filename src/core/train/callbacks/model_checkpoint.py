@@ -35,12 +35,12 @@ class ModelCheckpoint(Callback):
     def get_config(self):
         return {'directory': format_path(self.directory), 'period': self.period}
 
-    @staticmethod
-    def checkpoint_basename(epoch: int) -> str:
+    @classmethod
+    def checkpoint_basename(cls, epoch: int) -> str:
         return f'epoch{epoch}.pth'
 
-    @staticmethod
-    def epoch_number(path: str | os.PathLike[str]):
+    @classmethod
+    def epoch_number(cls, path: str | os.PathLike[str]):
         return int(os.path.basename(path)[5:-4])
 
     @classmethod
