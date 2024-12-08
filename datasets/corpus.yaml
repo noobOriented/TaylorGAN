@@ -1,14 +1,7 @@
 .english_common: &english_common
   embedding_path: datasets/en_fasttext_V80000D300.json
   segmentor:
-    split_token: ' '
-    operators:
-      - type: sub
-        pattern: '\s+'
-        repl: ' '
-      - type: strip
-      - type: lower
-      - type: split-english
+    type: english
 
 coco_cleaned:
   path:

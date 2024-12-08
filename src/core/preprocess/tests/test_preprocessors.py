@@ -2,8 +2,8 @@ import pathlib
 
 import pytest
 
-from .. import CorpusConfig, Segmentor, Tokenizer
-from .._segmentor import SplitEnglish
+from .. import CorpusConfig, Tokenizer
+from .._segmentor import EnglishSegmentor
 
 
 @pytest.fixture(scope='session')
@@ -24,7 +24,7 @@ def corpus_config(data_dir: pathlib.Path):
         path=data_dir / 'train.txt',
         maxlen=10,
         embedding_path=data_dir / 'en_fasttext_word2vec_V100D20.json',
-        segmentor=Segmentor(split_token=' ', operators=[SplitEnglish(type='split-english')]),
+        segmentor=EnglishSegmentor(),
     )
 
 
