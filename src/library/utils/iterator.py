@@ -2,7 +2,7 @@ from contextlib import contextmanager
 
 import numpy as np
 from tqdm import tqdm
-
+import typing as t
 from .file_helper import count_lines
 
 
@@ -13,9 +13,18 @@ def tqdm_open(filepath, mode='r'):
         yield tqdm(f, total=total, unit='line')
 
 
-def batch_generator(data, batch_size: int, shuffle: bool = False, full_batch_only: bool = False):
+def batch_generator[S: t.Sequence | np.ndarray](
+    data: S, batch_size: int, *,
+    shuffle: bool = False, full_batch_only: bool = False,
+) -> t.Iterator[S]:
     total = len(data)
-    stop = (total - batch_size + 1) if full_batch_only else total
+    if full_batch_only:
+        if total < batch_size:
+            raise ValueError
+        stop = total - batch_size + 1
+    else:
+        stop = total
+
     if shuffle:
         ids = np.random.permutation(total)
         for start in range(0, stop, batch_size):

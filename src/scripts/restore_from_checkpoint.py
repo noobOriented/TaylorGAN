@@ -4,7 +4,7 @@ import pathlib
 
 import pydantic
 
-from core.train.callbacks import ModelCheckpoint
+from core.train import ModelCheckpointSaver
 
 from . import train
 from ._configs import GANTrainingConfigs, MLETrainingConfigs
@@ -55,7 +55,7 @@ def main():
     train.main(
         main_args,
         base_tag=os.path.basename(restore_path),
-        checkpoint=ModelCheckpoint.latest_checkpoint(restore_path),
+        checkpoint=ModelCheckpointSaver.latest_checkpoint(restore_path),
     )
 
 

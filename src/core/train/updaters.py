@@ -8,10 +8,10 @@ from core.objectives.collections import LossCollection
 from library.utils import logging_indent, reuse_method_call
 
 from .optimizer import OptimizerWrapper
-from .pubsub_base import Subject
+from .pubsub import EventHook
 
 
-class ModuleUpdater(Subject):
+class ModuleUpdater:
 
     def __init__(
         self,
@@ -24,7 +24,7 @@ class ModuleUpdater(Subject):
         self.losses = losses
 
         self.step = 0
-        super().__init__()
+        self.hook = EventHook[int, t.Mapping[str, float]]()
 
     @abc.abstractmethod
     def update_step(self):
@@ -44,7 +44,7 @@ class ModuleUpdater(Subject):
 
     @property
     def info(self):
-        return f"{self.module.scope[0]} {self.module}"
+        return f"{self.module.scope[0]} {str(self.module).splitlines()[0]}"  # FIXME
 
     def summary(self):
         with logging_indent(self.module.scope):
@@ -78,9 +78,7 @@ class GeneratorUpdater(ModuleUpdater):
             key: tensor.detach().numpy()
             for key, tensor in loss_collection.observables.items()
         }
-        for subscriber in self._subscribers:
-            subscriber.update(self.step, losses)
-
+        self.hook(self.step, losses)
         self.optimizer.step()
 
 
@@ -107,7 +105,5 @@ class DiscriminatorUpdater(ModuleUpdater):
             key: tensor.detach().numpy()
             for key, tensor in loss_collection.observables.items()
         }
-        for subscriber in self._subscribers:
-            subscriber.update(self.step, losses)
-
+        self.hook(self.step, losses)
         self.optimizer.step()

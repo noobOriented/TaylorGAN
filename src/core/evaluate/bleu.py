@@ -3,6 +3,7 @@ import typing as t
 from collections import Counter, defaultdict
 
 import numpy as np
+import numpy.typing as npt
 from tqdm import tqdm
 
 from core.cache import cache_center
@@ -33,7 +34,7 @@ class BLEUCalculator:
         ]
         self.brevity_penalty = get_brevity_penalty_table(ref_lengths, maxlen=references.shape[1])
 
-    def mean_bleu(self, candidates: np.ndarray) -> np.ndarray:
+    def mean_bleu(self, candidates: npt.NDArray[np.uint]) -> dict[str, float]:
         mean_bleu = np.mean(self.bleu(candidates), axis=0)  # shape (max_gram)
         return {
             f"BLEU-{n}": bleu_n
@@ -41,7 +42,7 @@ class BLEUCalculator:
         }
 
     @classmethod
-    def selfbleu(cls, samples, **kwargs):
+    def selfbleu(cls, samples: npt.NDArray, **kwargs) -> dict[str, float]:
         candidates, references = np.split(samples, 2)
         bleu = cls(references, **kwargs).bleu(candidates)
         mean_bleu = np.mean(bleu, axis=0)  # shape (max_gram)
