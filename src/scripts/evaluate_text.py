@@ -29,7 +29,7 @@ def main():
             BLEUMetrics(
                 preprocessed_result.dataset,
                 max_gram=args.bleu,
-                eos_idx=preprocessed_result.special_tokens.eos.idx,
+                eos_idx=preprocessed_result.special_tokens.EOS.idx,
                 cache_dir=preprocessed_result.cache_key,
             ),
         )

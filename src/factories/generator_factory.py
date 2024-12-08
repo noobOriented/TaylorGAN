@@ -23,7 +23,7 @@ class GeneratorConfigs(pydantic.BaseModel):
 
         embedder = Embedding.from_pretrained(
             torch.from_numpy(data.embedding_matrix),
-            padding_idx=data.special_tokens.pad.idx,
+            padding_idx=data.special_tokens.PAD.idx,
             freeze=self.g_fix_embeddings,
         )
         presoftmax_layer = Linear(embedder.embedding_dim, embedder.num_embeddings)
@@ -40,7 +40,7 @@ class GeneratorConfigs(pydantic.BaseModel):
                 Linear(cell.hidden_size, embedder.embedding_dim, bias=False),
                 presoftmax_layer,
             ),
-            special_token_config=data.special_tokens,
+            special_tokens=data.special_tokens,
         )
 
 

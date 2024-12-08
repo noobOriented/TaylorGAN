@@ -27,21 +27,10 @@ class DataConfigs(pydantic.BaseModel):
             tokenizer = self._create_tokenizer()
 
         with logging_indent("Preprocess text corpus..."):
-            data_collection: dict[str, TextDataset] = {}
-            for key, path in self._corpus_config.path.items():
-                @cache_center.to_npz(self._cache_key, f'{key}_data.npz')
-                def _process_text_file(filepath):
-                    print(f"Load corpus data from {format_path(filepath)}")
-                    with tqdm_open(filepath) as f:
-                        return tokenizer.texts_to_array(f)
-
-                with logging_indent(f"{key} data:", bullet=False):
-                    ids = _process_text_file(path)
-                    texts = [tokenizer.ids_to_text(idx) for idx in ids]
-                    data_collection[key] = TextDataset(ids=ids, texts=texts)
+            dataset = self._load_dataset(tokenizer)
 
         return PreprocessResult(
-            dataset=data_collection,
+            dataset=dataset,
             tokenizer=tokenizer,
             embedding_path=self._corpus_config.embedding_path,
             cache_key=self._cache_key,
@@ -50,15 +39,29 @@ class DataConfigs(pydantic.BaseModel):
     def _create_tokenizer(self):
         p = cache_center.root_path / self._cache_key / 'tokenizer.json'
         if p.exists():
-            with open(p) as f:
-                return Tokenizer.model_validate_json(f.read())
+            return Tokenizer.model_validate_json(p.read_text())
 
         print(f'Build text mapper based on corpus data from {format_path(self._corpus_config.path["train"])}')
         tokenizer = Tokenizer.fit_corpus(self._corpus_config)
         p.parent.mkdir(parents=True, exist_ok=True)
-        with open(p, 'w') as f:
-            f.write(tokenizer.model_dump_json(indent=2))
+        p.write_text(tokenizer.model_dump_json(indent=2))
         return tokenizer
+
+    def _load_dataset(self, tokenizer: Tokenizer):
+        d: dict[str, TextDataset] = {}
+        for key, path in self._corpus_config.path.items():
+            @cache_center.to_npz(self._cache_key, f'{key}_data.npz')
+            def _process_text_file(filepath):
+                print(f"Load corpus data from {format_path(filepath)}")
+                with tqdm_open(filepath) as f:
+                    return tokenizer.texts_to_array(f)
+
+            with logging_indent(f"{key} data:", bullet=False):
+                ids = _process_text_file(path)
+                texts = [tokenizer.ids_to_text(idx) for idx in ids]
+                d[key] = TextDataset(ids=ids, texts=texts)
+
+        return d
 
     @functools.cached_property
     def _corpus_config(self):
@@ -73,9 +76,4 @@ class DataConfigs(pydantic.BaseModel):
 
     @functools.cached_property
     def _cache_key(self) -> str:
-        key = self.dataset
-        if self.maxlen:
-            key += f'_L{self.maxlen}'
-        if self.vocab_size:
-            key += f'_V{self.vocab_size}'
-        return key
+        return '_'.join(map(str, self.model_dump(exclude_none=True).values()))

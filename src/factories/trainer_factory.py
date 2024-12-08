@@ -82,7 +82,7 @@ class GANObjectiveConfigs(pydantic.BaseModel):
         embedder = Embedding.from_pretrained(
             torch.from_numpy(data.embedding_matrix),
             freeze=self.d_fix_embeddings,
-            padding_idx=data.special_tokens.pad.idx,
+            padding_idx=data.special_tokens.PAD.idx,
         )
         return Discriminator(
             network=network_func(embedder.embedding_dim),

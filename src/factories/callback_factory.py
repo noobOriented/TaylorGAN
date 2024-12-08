@@ -26,12 +26,12 @@ def create(
     trainer: Trainer,
     generator: Generator,
     data: PreprocessResult,
-    base_tag: str | None,
+    base_tag: str | None = None,
 ):
     base_tag = base_tag or f"{args.dataset}@{time.strftime('%Y%m%d-%H%M%S')}"
     creator = _CallbackCreator(
         generator=generator,
-        metadata=data,
+        data=data,
         tags=args.tags + [base_tag],
     )
 
@@ -82,9 +82,9 @@ class _Args(t.Protocol):
 
 class _CallbackCreator:
 
-    def __init__(self, generator, metadata: PreprocessResult, tags: list[str]):
+    def __init__(self, generator, data: PreprocessResult, tags: list[str]):
         self.generator = generator
-        self.data = metadata
+        self.data = data
         self.tag = pathlib.Path(*tags)
 
     def create_evaluator(self, bleu_n_gram: int | None, sample_size: int, fed_sample_size: int | None):
@@ -167,7 +167,7 @@ class EvaluatorCreator:
     def _attach_basic(self, sample_size, evaluator):
 
         def mean_length(word_ids):
-            return {'mean_length': np.mean(get_seqlens(word_ids, self.data.special_tokens.eos.idx))}
+            return {'mean_length': np.mean(get_seqlens(word_ids, self.data.special_tokens.EOS.idx))}
 
         def log_texts(texts: list[str]):
             print(SEPARATION_LINE)
@@ -199,7 +199,7 @@ class EvaluatorCreator:
                     cache_dir=pathlib.Path(self.data.cache_key, f'{tag}_BLEU'),
                     verbose=True,
                     max_gram=max_gram,
-                    eos_idx=self.data.special_tokens.eos.idx,
+                    eos_idx=self.data.special_tokens.EOS.idx,
                     smoothing=SmoothingFunction.fuzz_smoothing,
                 )
             evaluator.on_batch_end.evaluate_ids(
@@ -215,7 +215,7 @@ class EvaluatorCreator:
             return BLEUCalculator.selfbleu(
                 word_ids,
                 max_gram=max_gram,
-                eos_idx=self.data.special_tokens.eos.idx,
+                eos_idx=self.data.special_tokens.EOS.idx,
                 smoothing=SmoothingFunction.fuzz_smoothing,
             )
 

@@ -4,10 +4,10 @@ import pathlib
 
 import pydantic
 
-from configs import GANTrainingConfigs, MLETrainingConfigs
 from core.train.callbacks import ModelCheckpoint
 
 from . import train
+from ._configs import GANTrainingConfigs, MLETrainingConfigs
 
 
 def main():

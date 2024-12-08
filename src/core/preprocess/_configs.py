@@ -1,10 +1,11 @@
+import enum
+import functools
 import pathlib
 import typing as t
 
-import more_itertools
 import pydantic
 
-from library.utils import logging_indent, tqdm_open
+from library.utils import tqdm_open
 
 from ._segmentor import Segmentor
 
@@ -28,32 +29,16 @@ class CorpusConfig(pydantic.BaseModel):
                 yield self.segmentor.segmentize_text(s)
 
 
-class SpecialTokenConfig:
+class SpecialToken(enum.StrEnum):
+    SOS = '<sos>'
+    EOS = '</s>'
+    PAD = '<pad>'
+    UNK = '<unk>'
 
-    class TokenIdxTuple(t.NamedTuple):
-        token: str
-        idx: int
-
-    def __init__(self, **kwargs: str):
-        if not more_itertools.all_unique(kwargs.values()):
-            raise KeyError("special tokens conflict.")
-
-        self._token_list = list(kwargs.values())
-        self._attrs = {
-            key: self.TokenIdxTuple(token, idx)
-            for idx, (key, token) in enumerate(kwargs.items())
-        }
-
-    @property
-    def tokens(self) -> list[str]:
-        return self._token_list
-
-    def __getattr__(self, key):
-        if key in self._attrs:
-            return self._attrs[key]
-        raise AttributeError
-
-    def summary(self):
-        with logging_indent("Special tokens config:"):
-            for key, (token, idx) in self._attrs.items():
-                print(f"{key} token: '{token}', index: {idx}.")
+    @functools.cached_property
+    def idx(self) -> int:
+        return next(
+            i
+            for i, token in enumerate(self.__class__)
+            if self == token
+        )
