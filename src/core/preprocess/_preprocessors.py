@@ -15,7 +15,7 @@ import pydantic
 from core.cache import cache_center
 from library.utils import format_path, logging_indent
 
-from ._configs import CorpusConfig, Segmentor, SpecialTokenConfig, WordEmbeddingCollection
+from ._configs import CorpusConfig, Segmentor, SpecialTokenConfig
 
 
 @dataclasses.dataclass
@@ -34,20 +34,31 @@ class PreprocessResult:
     embedding_path: pathlib.Path
     cache_key: str
 
-    def load_pretrained_embeddings(self) -> npt.NDArray[np.floating]:
+    @functools.cached_property
+    def embedding_matrix(self) -> npt.NDArray[np.floating]:
 
         @cache_center.to_npz(self.cache_key, 'word_vecs.npz')
         def load_embeddings():
             print(f"Load pretrained embedding from : {format_path(self.embedding_path)}")
             with open(self.embedding_path) as f:
-                wv = WordEmbeddingCollection.model_validate_json(f.read())
-            return wv.get_matrix_of_tokens(self.tokenizer.tokens)
+                d = pydantic.TypeAdapter(dict[str, list[float]]).validate_json(f.read())
+
+            dimension = len(more_itertools.first(d.values()))
+            unk_vector = d.get(self.special_tokens.unk.token) or ([0.] * dimension)
+            return np.asarray(
+                [d.get(token, unk_vector) for token in self.tokenizer.tokens],
+                dtype=np.float32,
+            )
 
         with logging_indent("Load pretrained embeddings:"):
             embeddings = load_embeddings()
             print(f"Dimensions: {embeddings.shape[1]}.")
 
         return embeddings
+
+    @property
+    def special_tokens(self) -> SpecialTokenConfig:
+        return self.tokenizer.special_tokens
 
     def summary(self):
         with logging_indent("Data summary:"):
@@ -68,7 +79,6 @@ class Tokenizer(pydantic.BaseModel):
         pad='<pad>',
         unk='<unk>',
     )
-    eos_idx: t.ClassVar[int] = special_tokens.eos.idx
 
     def texts_to_array(self, texts: t.Iterable[str]) -> npt.NDArray[np.int32]:
         return np.asarray(
@@ -87,7 +97,7 @@ class Tokenizer(pydantic.BaseModel):
     def ids_to_text(self, ids: t.Sequence[int]) -> str:
         return self.segmentor.join_text(
             self.tokens[idx]
-            for idx in itertools.takewhile(lambda x: x != self.eos_idx, ids)
+            for idx in itertools.takewhile(lambda x: x != self.special_tokens.eos.idx, ids)
         )
 
     @classmethod

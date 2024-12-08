@@ -1,10 +1,8 @@
 import pathlib
 
-import numpy as np
 import pytest
 
 from .. import CorpusConfig, Segmentor, Tokenizer
-from .._configs import WordEmbeddingCollection
 from .._segmentor import SplitEnglish
 
 
@@ -16,7 +14,7 @@ def cache_root_dir(tmpdir_factory):
 @pytest.fixture(scope='session', autouse=True)
 def redirect_cache_root(cache_root_dir):
     from core.cache import cache_center
-    cache_center.root_path = str(cache_root_dir)
+    cache_center.root_path = cache_root_dir
 
 
 @pytest.fixture(scope='session')
@@ -28,19 +26,6 @@ def corpus_config(data_dir: pathlib.Path):
         embedding_path=data_dir / 'en_fasttext_word2vec_V100D20.json',
         segmentor=Segmentor(split_token=' ', operators=[SplitEnglish(type='split-english')]),
     )
-
-
-class TestWordEmbeddingCollection:
-
-    def test_get_matrix(self):
-        wordvec = WordEmbeddingCollection(
-            token2index={'a': 0, 'b': 1, 'c': 2, WordEmbeddingCollection.UNK: 3},
-            vectors=[[0, 1], [2, 3], [4, 5], [6, 7]],
-        )
-        assert np.array_equal(
-            wordvec.get_matrix_of_tokens(['b', 'd is unk', 'a']),
-            np.asarray([[2, 3], [6, 7], [0, 1]], dtype=np.float32),
-        )
 
 
 class TestTokenizer:

@@ -80,9 +80,9 @@ class GANObjectiveConfigs(pydantic.BaseModel):
         print(f"Create discriminator: {self.discriminator}")
         network_func = _D_MODELS(self.discriminator)
         embedder = Embedding.from_pretrained(
-            torch.from_numpy(data.load_pretrained_embeddings()),
+            torch.from_numpy(data.embedding_matrix),
             freeze=self.d_fix_embeddings,
-            padding_idx=data.tokenizer.special_tokens.pad.idx,
+            padding_idx=data.special_tokens.pad.idx,
         )
         return Discriminator(
             network=network_func(embedder.embedding_dim),

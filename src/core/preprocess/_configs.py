@@ -2,33 +2,11 @@ import pathlib
 import typing as t
 
 import more_itertools
-import numpy as np
-import numpy.typing as npt
 import pydantic
 
 from library.utils import logging_indent, tqdm_open
 
 from ._segmentor import Segmentor
-
-
-class WordEmbeddingCollection(pydantic.BaseModel):
-    token2index: dict[str, int]
-    vectors: list[list[float]]
-
-    UNK: t.ClassVar = '<unk>'
-
-    def get_matrix_of_tokens(self, tokens: t.Iterable[str]) -> npt.NDArray[np.float32]:
-        return np.asarray(
-            [self._get_vector_of_token(token) for token in tokens],
-            dtype=np.float32,
-        )
-
-    def _get_vector_of_token(self, token: str):
-        if (index := self.token2index.get(token)) is not None:
-            return self.vectors[index]
-        if (index := self.token2index.get(self.UNK)) is not None:
-            return self.vectors[index]
-        return np.zeros_like(self.vectors[0])
 
 
 class CorpusConfig(pydantic.BaseModel):
