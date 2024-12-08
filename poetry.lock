@@ -2005,17 +2005,6 @@ files = [
 ]
 
 [[package]]
-name = "u-msgpack-python"
-version = "2.8.0"
-description = "A portable, lightweight MessagePack serializer and deserializer written in pure Python."
-optional = false
-python-versions = "*"
-files = [
-    {file = "u-msgpack-python-2.8.0.tar.gz", hash = "sha256:b801a83d6ed75e6df41e44518b4f2a9c221dc2da4bcd5380e3a0feda520bc61a"},
-    {file = "u_msgpack_python-2.8.0-py2.py3-none-any.whl", hash = "sha256:1d853d33e78b72c4228a2025b4db28cda81214076e5b0422ed0ae1b1b2bb586a"},
-]
-
-[[package]]
 name = "wcwidth"
 version = "0.2.13"
 description = "Measures the displayed width of unicode strings in a terminal"
@@ -2093,4 +2082,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "f44d1e79235d10b88b7b8e1a464a7bf2be4bebda96ed3d2c6291418a27991b24"
+content-hash = "928f38cdc281b140e8acdac85be72f91397bf0c06478f879d11c3532b751e255"

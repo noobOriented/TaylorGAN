@@ -1,27 +1,15 @@
-import os
+import functools
 import typing as t
 
 import pydantic
 import yaml
-from dotenv import load_dotenv
 
-from core.preprocess import CorpusConfig, LanguageConfig, MetaData, TextDataset, UttutPreprocessor
-from library.utils import format_id
+from core.cache import cache_center
+from core.preprocess import CorpusConfig, PreprocessResult, TextDataset, Tokenizer
+from library.utils import format_id, format_path, logging_indent, tqdm_open
 
-
-load_dotenv('.env')
 
 CONFIG_PATH = 'datasets/corpus.yaml'
-LANGUAGE_CONFIGS = {
-    'english': LanguageConfig(
-        embedding_path=os.getenv('PRETRAINED_EN_WORD_FASTTEXT_PATH'),
-        split_token=' ',
-    ),
-    'test': LanguageConfig(
-        embedding_path='datasets/en_fasttext_word2vec_V100D20.msg',
-        split_token=' ',
-    ),
-}
 
 
 class DataConfigs(pydantic.BaseModel):
@@ -32,27 +20,60 @@ class DataConfigs(pydantic.BaseModel):
         pydantic.Field(ge=1, description='the maximum number of tokens. ordered by descending frequency.'),
     ] = None
 
-    def load_data(self) -> tuple[dict[str, TextDataset], MetaData]:
+    def load_data(self) -> PreprocessResult:
         print(f"data_id: {format_id(self.dataset)}")
-        preprocessor = UttutPreprocessor(self.maxlen, self.vocab_size)
-        corpus_config = _load_corpus_table(CONFIG_PATH)[self.dataset]
-        return preprocessor.preprocess(corpus_config, return_meta=True)
 
+        with logging_indent("Prepare text tokenizer..."):
+            tokenizer = self._create_tokenizer()
 
-def _load_corpus_table(path):
-    corpus_table = {}
-    with open(path) as f:
-        for data_id, corpus_dict in yaml.load(f, Loader=yaml.FullLoader).items():
-            language_id = corpus_dict['language']
-            config = CorpusConfig(
-                data_id,
-                path=path,
-                language_config=LANGUAGE_CONFIGS[language_id],
-                maxlen=corpus_dict.get('maxlen'),
-                vocab_size=corpus_dict.get('vocab_size'),
-            )
-            if 'train' in config.path and all(os.path.isfile(p) for p in config.path.values()):
-                # TODO else warning?
-                corpus_table[data_id] = config
+        with logging_indent("Preprocess text corpus..."):
+            dataset = self._load_dataset(tokenizer)
 
-    return corpus_table
+        return PreprocessResult(
+            dataset=dataset,
+            tokenizer=tokenizer,
+            embedding_path=self._corpus_config.embedding_path,
+            cache_key=self._cache_key,
+        )
+
+    def _create_tokenizer(self):
+        p = cache_center.root_path / self._cache_key / 'tokenizer.json'
+        if p.exists():
+            return Tokenizer.model_validate_json(p.read_text())
+
+        print(f'Build text mapper based on corpus data from {format_path(self._corpus_config.path["train"])}')
+        tokenizer = Tokenizer.fit_corpus(self._corpus_config)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(tokenizer.model_dump_json(indent=2))
+        return tokenizer
+
+    def _load_dataset(self, tokenizer: Tokenizer):
+        d: dict[str, TextDataset] = {}
+        for key, path in self._corpus_config.path.items():
+            @cache_center.to_npz(self._cache_key, f'{key}_data.npz')
+            def _process_text_file(filepath):
+                print(f"Load corpus data from {format_path(filepath)}")
+                with tqdm_open(filepath) as f:
+                    return tokenizer.texts_to_array(f)
+
+            with logging_indent(f"{key} data:", bullet=False):
+                ids = _process_text_file(path)
+                texts = [tokenizer.ids_to_text(idx) for idx in ids]
+                d[key] = TextDataset(ids=ids, texts=texts)
+
+        return d
+
+    @functools.cached_property
+    def _corpus_config(self):
+        d = {'name': self.dataset, 'maxlen': self.maxlen, 'vocab_size': self.vocab_size}
+        with open(CONFIG_PATH) as f:
+            d |= yaml.safe_load(f)[self.dataset]
+    
+        c = CorpusConfig(**d)
+        if not ('train' in c.path and all(p.exists() for p in c.path.values())):
+            raise KeyError  # TODO else warning?
+        return c
+
+    @functools.cached_property
+    def _cache_key(self) -> str:
+        return '_'.join(map(str, self.model_dump(exclude_none=True).values()))

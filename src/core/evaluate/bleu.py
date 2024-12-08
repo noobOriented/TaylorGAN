@@ -1,3 +1,4 @@
+import os
 import typing as t
 from collections import Counter, defaultdict
 
@@ -19,7 +20,7 @@ class BLEUCalculator:
         eos_idx: int = 1,
         smoothing: t.Callable | None = None,
         verbose: bool = False,
-        cache_dir=None,
+        cache_dir: str | os.PathLike[str] | None =None,
     ):
         self.eos_idx = self.INT_DTYPE(eos_idx)
         self.smoothing = smoothing
@@ -86,13 +87,15 @@ class NGramCounter:
 
     def __init__(self, references, seqlens, n, cache_dir=None, verbose=False):
 
-        @cache_center.to_pkl(cache_dir, f'{n}-gram.pkl')
         def create_ngram_counter():
             seqs = unpad(references, seqlens)
             if verbose:
                 print(f"Building {n}-gram table...")
                 seqs = tqdm(seqs, total=len(references), unit='sample')
             return counter_or(Counter(hashable_ngrams(s, n)) for s in seqs)
+
+        if cache_dir:
+            create_ngram_counter = cache_center.to_pkl(cache_dir, f'{n}-gram.pkl')(create_ngram_counter)
 
         self.counter = create_ngram_counter()
         self.n = n

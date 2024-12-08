@@ -1,7 +1,5 @@
 from .array_utils import get_seqlens, random_sample, safe_divide, unpad
-from .cache_utils import (
-    FileCache, JSONCache, JSONSerializableMixin, NumpyCache, PickleCache, reuse_method_call,
-)
+from .cache_utils import FileCache, NumpyCache, PickleCache, reuse_method_call
 from .collections import ExponentialMovingAverageMeter, counter_ior, counter_or
 from .file_helper import count_lines
 from .format_utils import (

@@ -14,9 +14,9 @@ def main():
         model_path: t.Annotated[pathlib.Path, pydantic.Field(description='path of serving model folder.')]
 
     args = parse_args_as(Args)
-    data_collection, meta = args.load_data()
-    generator = TextGenerator.load_traced(args.model_path, tokenizer=meta.tokenizer)
-    for tag, dataset in data_collection.items():
+    preprocessed_result = args.load_data()
+    generator = TextGenerator.load_traced(args.model_path, tokenizer=preprocessed_result.tokenizer)
+    for tag, dataset in preprocessed_result.dataset.items():
         print(f"Evaluate {tag} perplexity:")
         perplexity = generator.perplexity(dataset.ids)
         print(f"Perplexity = {perplexity}")

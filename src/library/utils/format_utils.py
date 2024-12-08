@@ -12,7 +12,7 @@ def format_list(lst):
     return ', '.join(map(repr, lst))
 
 
-def format_path(path: str) -> str:
+def format_path(path: object) -> str:
     return termcolor.colored(path, attrs=['underline'])
 
 

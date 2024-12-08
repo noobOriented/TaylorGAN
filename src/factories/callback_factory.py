@@ -11,7 +11,7 @@ from termcolor import colored
 
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction, TextGenerator
 from core.models.generators import Generator
-from core.preprocess import MetaData, TextDataset
+from core.preprocess import PreprocessResult
 from core.train.callbacks import (
     CallbackList, ModelCheckpoint, ModelSaver, ProgbarLogger,
     TensorBoardXWritter, TextEvaluator, TrainProfiler,
@@ -25,15 +25,13 @@ def create(
     args: _Args,
     trainer: Trainer,
     generator: Generator,
-    data_collection: t.Mapping[str, TextDataset],
-    metadata: MetaData,
-    base_tag: str | None,
+    data: PreprocessResult,
+    base_tag: str | None = None,
 ):
     base_tag = base_tag or f"{args.dataset}@{time.strftime('%Y%m%d-%H%M%S')}"
     creator = _CallbackCreator(
         generator=generator,
-        data_collection=data_collection,
-        metadata=metadata,
+        data=data,
         tags=args.tags + [base_tag],
     )
 
@@ -84,23 +82,21 @@ class _Args(t.Protocol):
 
 class _CallbackCreator:
 
-    def __init__(self, generator, data_collection: t.Mapping[str, TextDataset], metadata: MetaData, tags: list[str]):
+    def __init__(self, generator, data: PreprocessResult, tags: list[str]):
         self.generator = generator
-        self.data_collection = data_collection
-        self.metadata = metadata
+        self.data = data
         self.tag = pathlib.Path(*tags)
 
     def create_evaluator(self, bleu_n_gram: int | None, sample_size: int, fed_sample_size: int | None):
         return EvaluatorCreator(
             text_generator=self.text_generator,
-            data_collection=self.data_collection,
-            metadata=self.metadata,
+            data=self.data,
         ).create(bleu_n_gram, sample_size, fed_sample_size)
 
     def create_loggers(self, updaters, tensorboard_logdir: pathlib.Path | None):
         yield ProgbarLogger(
             desc=str(self.tag),
-            total=len(self.data_collection['train']),
+            total=len(self.data.dataset['train']),
             updaters=updaters,
         )
         if tensorboard_logdir:
@@ -121,7 +117,8 @@ class _CallbackCreator:
         if serving_root:
             serving_dir = serving_root / self.tag
             serving_dir.mkdir(exist_ok=True)
-            self.metadata.tokenizer.save(serving_dir / 'tokenizer.json')
+            with open(serving_dir / 'tokenizer.json', 'w') as f:
+                f.write(self.data.tokenizer.model_dump_json())
             yield ModelSaver(
                 module=self.text_generator,
                 directory=serving_dir,
@@ -149,15 +146,14 @@ class _CallbackCreator:
 
     @functools.cached_property
     def text_generator(self):
-        return TextGenerator(self.generator, tokenizer=self.metadata.tokenizer)
+        return TextGenerator(self.generator, tokenizer=self.data.tokenizer)
 
 
 class EvaluatorCreator:
 
-    def __init__(self, text_generator, data_collection: t.Mapping[str, TextDataset], metadata: MetaData):
+    def __init__(self, text_generator, data: PreprocessResult):
         self.text_generator = text_generator
-        self.data_collection = data_collection
-        self.metadata = metadata
+        self.data = data
 
     def create(self, bleu_n_gram: int | None, sample_size: int, fed_sample_size: int | None):
         evaluator = TextEvaluator(self.text_generator)
@@ -171,13 +167,13 @@ class EvaluatorCreator:
     def _attach_basic(self, sample_size, evaluator):
 
         def mean_length(word_ids):
-            return {'mean_length': np.mean(get_seqlens(word_ids, self.metadata.eos_idx))}
+            return {'mean_length': np.mean(get_seqlens(word_ids, self.data.special_tokens.EOS.idx))}
 
         def log_texts(texts: list[str]):
             print(SEPARATION_LINE)
             print()
             print(colored("Real Sentences (Random Sampled):", 'blue'))
-            print_samples(random_sample(self.data_collection['train'].texts, len(texts)))
+            print_samples(random_sample(self.data.dataset['train'].texts, len(texts)))
             print()
             print(colored("Fake Sentences (Random Sampled):", 'red'))
             print_samples(texts)
@@ -196,18 +192,15 @@ class EvaluatorCreator:
         )
 
     def _attach_bleu(self, max_gram, sample_size, evaluator):
-        shared_kwargs = dict(
-            max_gram=max_gram,
-            eos_idx=self.metadata.eos_idx,
-            smoothing=SmoothingFunction.fuzz_smoothing,
-        )
-        for tag, dataset in self.data_collection.items():
+        for tag, dataset in self.data.dataset.items():
             with logging_indent(f"Building '{tag}' data BLEU table..."):
                 calculator = BLEUCalculator(
                     dataset.ids,
-                    cache_dir=self.metadata.cache_dir / f"{tag}_BLEU",
+                    cache_dir=pathlib.Path(self.data.cache_key, f'{tag}_BLEU'),
                     verbose=True,
-                    **shared_kwargs,
+                    max_gram=max_gram,
+                    eos_idx=self.data.special_tokens.EOS.idx,
+                    smoothing=SmoothingFunction.fuzz_smoothing,
                 )
             evaluator.on_batch_end.evaluate_ids(
                 calculator.mean_bleu,
@@ -219,16 +212,21 @@ class EvaluatorCreator:
         def selfbleu(word_ids) -> t.Callable:
             print("Evaluating generated data SelfBLEU...")
             print()
-            return BLEUCalculator.selfbleu(word_ids, **shared_kwargs)
+            return BLEUCalculator.selfbleu(
+                word_ids,
+                max_gram=max_gram,
+                eos_idx=self.data.special_tokens.EOS.idx,
+                smoothing=SmoothingFunction.fuzz_smoothing,
+            )
 
         evaluator.on_epoch_end.evaluate_ids(
             selfbleu,
-            sample_size=min(10000, 2 * len(self.data_collection['train'])),
+            sample_size=min(10000, 2 * len(self.data.dataset['train'])),
             channel=register_channel('samples'),
         )
 
     def _attach_fed(self, sample_size, evaluator):
-        for tag, dataset in self.data_collection.items():
+        for tag, dataset in self.data.dataset.items():
             print(f"Building '{tag}' data FED sentence encoder...")
             calculator = FEDCalculator(
                 hub_url="https://tfhub.dev/google/universal-sentence-encoder-large/3",
