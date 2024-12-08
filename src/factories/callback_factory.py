@@ -135,7 +135,7 @@ class _CallbackCreator:
     def text_generator(self):
         return TextGenerator(self.generator, tokenizer=self.data.tokenizer)
 
-    def _attach_basic(self, sample_size, evaluator):
+    def _attach_basic(self, sample_size, evaluator: TextEvaluator):
 
         def mean_length(word_ids):
             return {'mean_length': np.mean(get_seqlens(word_ids, self.data.special_tokens.EOS.idx))}
@@ -162,7 +162,7 @@ class _CallbackCreator:
             period=100,
         )
 
-    def _attach_bleu(self, max_gram, sample_size, evaluator):
+    def _attach_bleu(self, max_gram: int, sample_size: int, evaluator: TextEvaluator):
         for tag, dataset in self.data.dataset.items():
             with logging_indent(f"Building '{tag}' data BLEU table..."):
                 calculator = BLEUCalculator(
@@ -196,7 +196,7 @@ class _CallbackCreator:
             channel=register_channel('samples'),
         )
 
-    def _attach_fed(self, sample_size, evaluator):
+    def _attach_fed(self, sample_size: int, evaluator: TextEvaluator):
         for tag, dataset in self.data.dataset.items():
             print(f"Building '{tag}' data FED sentence encoder...")
             calculator = FEDCalculator(

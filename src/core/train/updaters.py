@@ -78,9 +78,7 @@ class GeneratorUpdater(ModuleUpdater):
             key: tensor.detach().numpy()
             for key, tensor in loss_collection.observables.items()
         }
-        for subscriber in self._subscribers:
-            subscriber.update(self.step, losses)
-
+        self.notify(self.step, losses)
         self.optimizer.step()
 
 
@@ -107,7 +105,5 @@ class DiscriminatorUpdater(ModuleUpdater):
             key: tensor.detach().numpy()
             for key, tensor in loss_collection.observables.items()
         }
-        for subscriber in self._subscribers:
-            subscriber.update(self.step, losses)
-
+        self.notify(self.step, losses)
         self.optimizer.step()

@@ -5,7 +5,7 @@ from core.evaluate import TextGenerator
 from library.utils import logging_indent, reuse_method_call
 
 from .base import Callback
-from .channels import MessageChannel
+from .channels import Subject
 
 
 class TextEvaluator(Callback):
@@ -23,7 +23,7 @@ class TextEvaluator(Callback):
 
 class EvaluateCommander:
 
-    def __init__(self, generator: TextGenerator):
+    def __init__(self, generator: TextGenerator, /):
         self.generator = generator
         self._command_list = []
 
@@ -37,20 +37,18 @@ class EvaluateCommander:
         evaluator: t.Callable,
         sample_size: int,
         on_text: bool,
-        channel: MessageChannel | None = None,
+        channel: Subject | None = None,
         period: int = 1,
     ):
-        def command(generator, step):  # late bind generator to allow cache
+        def command(generator: TextGenerator, step):  # late bind generator to allow cache
             if step % period != 0:
                 return
-            if on_text:
-                samples = generator.generate_texts(sample_size)
-            else:
-                samples = generator.generate_ids(sample_size)
 
+            foo = generator.generate_texts if on_text else generator.generate_ids
+            samples = foo(sample_size)
             result = evaluator(samples)
             if channel:
-                channel.post(step, result)
+                channel.notify(step, result)
 
         command._info = f"{evaluator.__name__} on {sample_size} samples, every {period} steps"
         self._command_list.append(command)

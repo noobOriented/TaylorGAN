@@ -1,9 +1,10 @@
+import typing as t
 from itertools import chain
 
 import termcolor
 
 
-def left_aligned(str_list: list[str]) -> list[str]:
+def left_aligned(str_list: t.Iterable[str]) -> list[str]:
     maxlen = max(map(len, str_list), default=0)
     return [f"{s:<{maxlen}}" for s in str_list]
 

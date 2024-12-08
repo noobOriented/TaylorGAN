@@ -1,5 +1,4 @@
-from .base import Callback, NullCallback
-from .callback_list import CallbackList
+from .base import Callback, CallbackList, NullCallback
 from .evaluator import TextEvaluator
 from .model_checkpoint import ModelCheckpoint
 from .model_saver import ModelSaver
