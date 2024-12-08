@@ -9,11 +9,10 @@ from library.utils import (
     SEPARATION_LINE, ExponentialMovingAverageMeter, TqdmRedirector, format_highlight2, left_aligned,
 )
 
-from ..pubsub import CHANNELS
-from .base import Callback
+from .pubsub import CHANNELS
 
 
-class ProgbarLogger(Callback):
+class ProgbarLogger:
 
     def __init__(self, desc: str, total: int, updaters: t.Sequence[ModuleUpdater]):
         self.desc = format_highlight2(desc)
@@ -24,10 +23,7 @@ class ProgbarLogger(Callback):
     def on_train_begin(self, is_restored: bool):
         TqdmRedirector.enable()
         self._add_bar(bar_format=SEPARATION_LINE)
-        self.header = self._add_bar(
-            bar_format="{desc}: {elapsed}",
-            desc=self.desc,
-        )
+        self._header = self._add_bar(bar_format="{desc}: {elapsed}", desc=self.desc)
         for updater in self._updaters:
             pbar = self._add_bar(desc=updater.info)
             pbar.format_meter = _format_meter_for_losses
@@ -53,7 +49,7 @@ class ProgbarLogger(Callback):
         self._add_bar(bar_format=SEPARATION_LINE)
 
     def on_epoch_begin(self, epoch):
-        self.body = self._add_bar(
+        self._databar = self._add_bar(
             bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]',
             desc=f"Epoch {epoch}",
             total=self.total,
@@ -63,12 +59,11 @@ class ProgbarLogger(Callback):
         )
 
     def on_batch_end(self, batch: int, batch_data):
-        self.header.refresh()
-        self.body.update(len(batch_data))
+        self._header.refresh()
+        self._databar.update(len(batch_data))
 
     def on_epoch_end(self, epoch):
-        self._bars.pop()
-        self.body.close()
+        self._bars.pop().close()
 
     def on_train_end(self):
         for bar in self._bars:

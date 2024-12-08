@@ -13,9 +13,9 @@ import torch
 from core.evaluate import TextGenerator
 from core.models.generators import Generator
 from core.preprocess import PreprocessResult
-from core.train.callbacks import Callback, CustomCallback, ModelCheckpoint, ProgbarLogger
+from core.train import Callback, ModelCheckpointSaver, Trainer
+from core.train.loggers import ProgbarLogger
 from core.train.pubsub import CHANNELS, register_channel
-from core.train.trainers import Trainer
 from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
 
 
@@ -33,14 +33,7 @@ def create(
         trainer=trainer,
         base_tag=base_tag,
     )
-    for cbk in creator.create_callbacks():
-        creator.callback.on_train_begin.attach(cbk.on_train_begin)
-        creator.callback.on_epoch_begin.attach(cbk.on_epoch_begin)
-        creator.callback.on_batch_begin.attach(cbk.on_batch_begin)
-        creator.callback.on_batch_end.attach(cbk.on_batch_end)
-        creator.callback.on_epoch_end.attach(cbk.on_epoch_end)
-        creator.callback.on_train_end.attach(cbk.on_train_end)
-    
+    creator.attach_events()
     return creator.callback
 
 
@@ -79,19 +72,25 @@ class _CallbackCreator:
         self.data = data
         self.generator = generator
         self.trainer = trainer
-        self.callback = CustomCallback()
+        self.callback = Callback()
 
         base_tag = base_tag or f"{data.cache_key}@{time.strftime('%Y%m%d-%H%M%S')}"
         self.tag = pathlib.Path(*self.args.tags, base_tag)
         self.text_generator = TextGenerator(self.generator, tokenizer=self.data.tokenizer)
 
-    def create_callbacks(self) -> t.Iterator[Callback]:
+    def attach_events(self):
         self._attach_evaluators()
-        yield ProgbarLogger(
+        bar = ProgbarLogger(
             desc=str(self.tag),
             total=len(self.data.dataset['train']),
             updaters=self.trainer.updaters,
         )
+        self.callback.on_train_begin.attach(bar.on_train_begin)
+        self.callback.on_epoch_begin.attach(bar.on_epoch_begin)
+        self.callback.on_batch_end.attach(bar.on_batch_end)
+        self.callback.on_epoch_end.attach(bar.on_epoch_end)
+        self.callback.on_train_end.attach(bar.on_train_end)
+
         if self.args.tensorboard:
             self._attach_tensorboard()
 
@@ -109,12 +108,24 @@ class _CallbackCreator:
                     torch.jit.save(traced, str(path))
 
         if self.args.checkpoint_root:
-            yield ModelCheckpoint(
-                self.args,
+            saver = ModelCheckpointSaver(
                 trainer=self.trainer,
                 directory=self.args.checkpoint_root / self.tag,
-                period=self.args.save_period,
             )
+
+            @self.callback.on_train_begin.attach
+            def save_args(is_restored: bool):
+                saver.directory.mkdir(exist_ok=True)
+                if not is_restored:
+                    with open(saver.directory / 'args', 'w') as f:
+                        f.write(self.args.model_dump_json())
+
+            @self.callback.on_epoch_end.attach
+            def save_model(epoch: int):
+                if epoch % self.args.save_period == 0:
+                    print(f"{epoch} epochs done.")
+                    saver.save(epoch)
+
         else:
             warnings.warn("`checkpoint_root` is not given. Training can't be restored!")
 

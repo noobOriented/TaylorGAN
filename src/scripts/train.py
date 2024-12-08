@@ -1,7 +1,6 @@
 import os
 
-from core.train import DataLoader
-from core.train.callbacks import ModelCheckpoint
+from core.train import DataLoader, ModelCheckpointSaver
 from factories import callback_factory
 from library.utils import logging_indent, parse_args_as
 from scripts.snippets import set_global_random_seed
@@ -56,6 +55,6 @@ def main(
     if checkpoint:
         print(f"Restore from checkpoint: {checkpoint}")
         trainer.load_state(path=checkpoint)
-        data_loader.skip_epochs(ModelCheckpoint.epoch_number(checkpoint))
+        data_loader.skip_epochs(ModelCheckpointSaver.epoch_number(checkpoint))
 
     trainer.fit(data_loader)

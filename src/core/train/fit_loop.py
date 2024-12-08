@@ -5,7 +5,7 @@ import typing as t
 import more_itertools
 import numpy.typing as npt
 
-from core.train.callbacks import NullCallback, Callback
+from core.train.pubsub import Event
 from library.utils import batch_generator, format_highlight
 
 
@@ -16,12 +16,12 @@ class DataLoader:
         dataset: npt.NDArray,
         batch_size: int,
         n_epochs: int,
-        callback: Callback = NullCallback(),
+        callback: Callback | None = None,
     ):
         self.dataset = dataset
         self.batch_size = batch_size
         self.n_epochs = n_epochs
-        self.callback = callback
+        self.callback = callback or Callback()
 
         self._batch = 0
         self._epoch = 1
@@ -54,3 +54,13 @@ class DataLoader:
             batch_size=self.batch_size,
             shuffle=True,
         )
+
+
+class Callback:
+    def __init__(self) -> None:
+        self.on_train_begin = Event[bool]()
+        self.on_epoch_begin = Event[int]()
+        self.on_batch_begin = Event[int]()
+        self.on_batch_end = Event[int, npt.NDArray]()
+        self.on_epoch_end = Event[int]()
+        self.on_train_end = Event[()]()
