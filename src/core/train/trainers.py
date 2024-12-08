@@ -1,4 +1,5 @@
 import abc
+import os
 import typing as t
 
 import numpy as np
@@ -15,14 +16,14 @@ class Trainer(abc.ABC):
         self.generator_updater = generator_updater
 
     @abc.abstractmethod
-    def fit(self, data_loader: t.Iterable[np.ndarray]):
+    def fit(self, data_loader: t.Iterable[np.ndarray], /):
         pass
 
-    def save_state(self, path):
+    def save_state(self, path: str | os.PathLike[str]):
         state_dict = [updater.state_dict() for updater in self.updaters]
         torch.save(state_dict, path)
 
-    def load_state(self, path):
+    def load_state(self, path: str | os.PathLike[str]):
         state_dicts = torch.load(path)
         for updater, state_dict in zip(self.updaters, state_dicts):
             updater.load_state_dict(state_dict)
@@ -38,7 +39,7 @@ class Trainer(abc.ABC):
 
 class NonParametrizedTrainer(Trainer):
 
-    def fit(self, data_loader: t.Iterable[np.ndarray]):
+    def fit(self, data_loader: t.Iterable[np.ndarray], /):
         for batch_data in data_loader:
             real_samples = TokenSequence(
                 torch.from_numpy(batch_data).type(torch.long),
@@ -59,7 +60,7 @@ class GANTrainer(Trainer):
         self.discriminator_updater = discriminator_updater
         self.d_steps = d_steps
 
-    def fit(self, data_loader: t.Iterable[np.ndarray]):
+    def fit(self, data_loader: t.Iterable[np.ndarray], /):
         for batch_data in data_loader:
             real_samples = TokenSequence(
                 torch.from_numpy(batch_data).type(torch.long),

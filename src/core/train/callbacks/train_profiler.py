@@ -1,4 +1,5 @@
 import cProfile
+import pathlib
 import pstats
 import sys
 
@@ -10,12 +11,12 @@ from .base import Callback
 class TrainProfiler(Callback):
 
     def __init__(
-            self,
-            warm_up: int,
-            duration: int,
-            export_filepath: str,
-            stop_training_when_finish: bool = False,
-        ):
+        self,
+        warm_up: int,
+        duration: int,
+        export_filepath: pathlib.Path,
+        stop_training_when_finish: bool = False,
+    ):
         if warm_up < 0:
             raise ValueError("'warm_up' should not be negative!")
         self.warm_up = warm_up

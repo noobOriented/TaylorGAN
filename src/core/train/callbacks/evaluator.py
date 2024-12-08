@@ -1,3 +1,4 @@
+import typing as t
 from functools import partialmethod
 
 from core.evaluate import TextGenerator
@@ -32,13 +33,13 @@ class EvaluateCommander:
                 command(generator, step)
 
     def _evaluate(
-            self,
-            evaluator: callable,
-            sample_size: int,
-            on_text: bool,
-            channel: MessageChannel = None,
-            period: int = 1,
-        ):
+        self,
+        evaluator: t.Callable,
+        sample_size: int,
+        on_text: bool,
+        channel: MessageChannel | None = None,
+        period: int = 1,
+    ):
         def command(generator, step):  # late bind generator to allow cache
             if step % period != 0:
                 return

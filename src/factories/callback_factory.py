@@ -7,14 +7,14 @@ import typing as t
 import warnings
 
 import numpy as np
-from termcolor import colored
+import termcolor
 
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction, TextGenerator
 from core.models.generators import Generator
 from core.preprocess import PreprocessResult
 from core.train.callbacks import (
-    CallbackList, ModelCheckpoint, ModelSaver, ProgbarLogger,
-    TensorBoardXWritter, TextEvaluator, TrainProfiler,
+    Callback, CallbackList, ModelCheckpoint, ModelSaver,
+    ProgbarLogger, TensorBoardXWritter, TextEvaluator, TrainProfiler,
 )
 from core.train.callbacks.channels import register_channel
 from core.train.trainers import Trainer
@@ -27,39 +27,20 @@ def create(
     generator: Generator,
     data: PreprocessResult,
     base_tag: str | None = None,
-):
-    base_tag = base_tag or f"{args.dataset}@{time.strftime('%Y%m%d-%H%M%S')}"
+) -> Callback:
     creator = _CallbackCreator(
-        generator=generator,
+        args,
         data=data,
-        tags=args.tags + [base_tag],
+        generator=generator,
+        trainer=trainer,
+        base_tag=base_tag,
     )
-
-    callback_list = CallbackList([
-        creator.create_evaluator(
-            bleu_n_gram=args.bleu,
-            sample_size=args.batch_size,
-            fed_sample_size=args.fed,
-        ),
-        *creator.create_loggers(
-            updaters=trainer.updaters,
-            tensorboard_logdir=args.tensorboard,
-        ),
-        *creator.create_savers(
-            args,
-            trainer=trainer,
-            serving_root=args.serving_root,
-            checkpoint_root=args.checkpoint_root,
-            period=args.save_period,
-        ),
-        *creator.create_profiler(args.profile),
-    ])
-    callback_list.summary()
-    return callback_list
+    cbk = CallbackList(list(creator.create_callbacks()))
+    cbk.summary()
+    return cbk
 
 
 class _Args(t.Protocol):
-    dataset: str
     batch_size: int
 
     # Evaluate
@@ -82,87 +63,77 @@ class _Args(t.Protocol):
 
 class _CallbackCreator:
 
-    def __init__(self, generator, data: PreprocessResult, tags: list[str]):
-        self.generator = generator
+    def __init__(
+        self,
+        args: _Args,
+        generator: Generator,
+        trainer: Trainer,
+        data: PreprocessResult,
+        base_tag: str | None = None,
+    ):
+        self.args = args
         self.data = data
-        self.tag = pathlib.Path(*tags)
+        self.generator = generator
+        self.trainer = trainer
 
-    def create_evaluator(self, bleu_n_gram: int | None, sample_size: int, fed_sample_size: int | None):
-        return EvaluatorCreator(
-            text_generator=self.text_generator,
-            data=self.data,
-        ).create(bleu_n_gram, sample_size, fed_sample_size)
+        base_tag = base_tag or f"{data.cache_key}@{time.strftime('%Y%m%d-%H%M%S')}"
+        self.tag = pathlib.Path(*self.args.tags, base_tag)
 
-    def create_loggers(self, updaters, tensorboard_logdir: pathlib.Path | None):
+    def create_callbacks(self) -> t.Iterator[Callback]:
+        yield self.create_evaluator()
         yield ProgbarLogger(
             desc=str(self.tag),
             total=len(self.data.dataset['train']),
-            updaters=updaters,
+            updaters=self.trainer.updaters,
         )
-        if tensorboard_logdir:
+        if self.args.tensorboard:
             yield TensorBoardXWritter(
-                updaters=updaters,
-                logdir=tensorboard_logdir / self.tag,
+                updaters=self.trainer.updaters,
+                logdir=self.args.tensorboard / self.tag,
                 log_period=10,
             )
 
-    def create_savers(
-        self,
-        args,
-        trainer,
-        serving_root: pathlib.Path | None,
-        checkpoint_root: pathlib.Path | None,
-        period: int,
-    ):
-        if serving_root:
-            serving_dir = serving_root / self.tag
-            serving_dir.mkdir(exist_ok=True)
+        if self.args.serving_root:
+            serving_dir = self.args.serving_root / self.tag
+            serving_dir.mkdir(parents=True, exist_ok=True)
             with open(serving_dir / 'tokenizer.json', 'w') as f:
                 f.write(self.data.tokenizer.model_dump_json())
             yield ModelSaver(
                 module=self.text_generator,
                 directory=serving_dir,
-                period=period,
+                period=self.args.save_period,
             )
 
-        if checkpoint_root:
+        if self.args.checkpoint_root:
             yield ModelCheckpoint(
-                args,
-                trainer=trainer,
-                directory=checkpoint_root / self.tag,
-                period=period,
+                self.args,
+                trainer=self.trainer,
+                directory=self.args.checkpoint_root / self.tag,
+                period=self.args.save_period,
             )
         else:
             warnings.warn("`checkpoint_root` is not given. Training can't be restored!")
 
-    def create_profiler(self, export_path: pathlib.Path | None):
-        if export_path:
+        if self.args.profile:
             yield TrainProfiler(
                 warm_up=100,
                 duration=200,
-                export_filepath=export_path,
+                export_filepath=self.args.profile,
                 stop_training_when_finish=True,
             )
+
+    def create_evaluator(self):
+        evaluator = TextEvaluator(self.text_generator)
+        self._attach_basic(self.args.batch_size, evaluator)
+        if self.args.bleu:
+            self._attach_bleu(self.args.bleu, self.args.batch_size, evaluator)
+        if self.args.fed:
+            self._attach_fed(self.args.fed, evaluator)
+        return evaluator
 
     @functools.cached_property
     def text_generator(self):
         return TextGenerator(self.generator, tokenizer=self.data.tokenizer)
-
-
-class EvaluatorCreator:
-
-    def __init__(self, text_generator, data: PreprocessResult):
-        self.text_generator = text_generator
-        self.data = data
-
-    def create(self, bleu_n_gram: int | None, sample_size: int, fed_sample_size: int | None):
-        evaluator = TextEvaluator(self.text_generator)
-        self._attach_basic(sample_size, evaluator)
-        if bleu_n_gram is not None:
-            self._attach_bleu(bleu_n_gram, sample_size, evaluator)
-        if fed_sample_size is not None:
-            self._attach_fed(fed_sample_size, evaluator)
-        return evaluator
 
     def _attach_basic(self, sample_size, evaluator):
 
@@ -172,10 +143,10 @@ class EvaluatorCreator:
         def log_texts(texts: list[str]):
             print(SEPARATION_LINE)
             print()
-            print(colored("Real Sentences (Random Sampled):", 'blue'))
+            print(termcolor.colored("Real Sentences (Random Sampled):", 'blue'))
             print_samples(random_sample(self.data.dataset['train'].texts, len(texts)))
             print()
-            print(colored("Fake Sentences (Random Sampled):", 'red'))
+            print(termcolor.colored("Fake Sentences (Random Sampled):", 'red'))
             print_samples(texts)
             print()
 

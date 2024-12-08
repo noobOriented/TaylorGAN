@@ -1,6 +1,5 @@
 import os
-import sys
-from pathlib import Path
+import pathlib
 
 import pydantic
 
@@ -12,10 +11,10 @@ from .base import Callback
 
 class ModelCheckpoint(Callback):
 
-    def __init__(self, args: pydantic.BaseModel, trainer: Trainer, directory: Path, period: int):
+    def __init__(self, args: pydantic.BaseModel, trainer: Trainer, directory: str | os.PathLike[str], period: int):
         self.args = args  # TODO global?
         self.trainer = trainer
-        self.directory = directory
+        self.directory = pathlib.Path(directory)
         if period <= 0:
             raise ValueError("'saving_period' should be positive!")
         self.period = period
@@ -37,17 +36,17 @@ class ModelCheckpoint(Callback):
         return {'directory': format_path(self.directory), 'period': self.period}
 
     @staticmethod
-    def checkpoint_basename(epoch: int):
+    def checkpoint_basename(epoch: int) -> str:
         return f'epoch{epoch}.pth'
 
     @staticmethod
-    def epoch_number(path):
+    def epoch_number(path: str | os.PathLike[str]):
         return int(os.path.basename(path)[5:-4])
 
     @classmethod
-    def latest_checkpoint(cls, directory) -> str:
+    def latest_checkpoint(cls, directory) -> str | os.PathLike[str]:
         filename = max(
             (filename for filename in os.listdir(directory) if filename.endswith('.pth')),
             key=cls.epoch_number,
         )
-        return os.path.join(directory, filename)
+        return pathlib.Path(directory, filename)
