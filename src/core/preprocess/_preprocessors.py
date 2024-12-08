@@ -13,58 +13,9 @@ import numpy.typing as npt
 import pydantic
 
 from core.cache import cache_center
-from library.utils import format_path, logging_indent, tqdm_open
+from library.utils import format_path, logging_indent
 
-from ._config_objects import (
-    CorpusConfig, Segmentor, SpecialTokenConfig, WordEmbeddingCollection,
-)
-
-
-class Preprocessor:
-
-    def __init__(self, corpus_config: CorpusConfig):
-        self.corpus_config = corpus_config
-
-    def preprocess(self):
-        with logging_indent("Prepare text tokenizer..."):
-            tokenizer = self._create_tokenizer()
-
-        with logging_indent("Preprocess text corpus..."):
-            data_collection: dict[str, TextDataset] = {}
-            for key, path in self.corpus_config.path.items():
-                @cache_center.to_npz(self.corpus_config.cache_path / f'{key}_data.npz')
-                def _process_text_file(filepath):
-                    print(f"Load corpus data from {format_path(filepath)}")
-                    with tqdm_open(filepath) as f:
-                        return tokenizer.texts_to_array(f)
-
-                with logging_indent(f"{key} data:", bullet=False):
-                    ids = _process_text_file(path)
-                    texts = [tokenizer.ids_to_text(idx) for idx in ids]
-                    text_dataset = TextDataset(ids=ids, texts=texts)
-                    data_collection[key] = text_dataset
-
-        metadata = MetaData(
-            tokenizer=tokenizer,
-            embedding_path=self.corpus_config.embedding_path,
-            cache_dir=self.corpus_config.cache_path,
-        )
-        return data_collection, metadata
-
-    def _create_tokenizer(self):
-        if cache_center.root_path:
-            p = cache_center.root_path / self.corpus_config.cache_path / 'tokenizer.json'
-            if p.exists():
-                with open(p) as f:
-                    return Tokenizer.model_validate_json(f.read())
-
-        print(f'Build text mapper based on corpus data from {format_path(self.corpus_config.path["train"])}')
-        tokenizer = Tokenizer.fit_corpus(self.corpus_config)
-        if cache_center.root_path:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            with open(p, 'w') as f:
-                f.write(tokenizer.model_dump_json(indent=2))
-        return tokenizer
+from ._config_objects import CorpusConfig, Segmentor, SpecialTokenConfig, WordEmbeddingCollection
 
 
 @dataclasses.dataclass

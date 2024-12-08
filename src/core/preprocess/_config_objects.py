@@ -48,8 +48,8 @@ class CorpusConfig(pydantic.BaseModel):
     path: dict[str, pathlib.Path]
     segmentor: Segmentor
     embedding_path: pathlib.Path
-    maxlen: int | None = None  # used when preprocessor.maxlen = None
-    vocab_size: int | None = None  # used when preprocessor.vocab_size = None
+    maxlen: int | None = None
+    vocab_size: int | None = None
 
     @pydantic.field_validator('path', mode='before')
     @classmethod

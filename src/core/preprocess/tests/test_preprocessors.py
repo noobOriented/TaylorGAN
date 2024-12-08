@@ -3,7 +3,7 @@ import pathlib
 import numpy as np
 import pytest
 
-from .. import CorpusConfig, Preprocessor, Segmentor, Tokenizer
+from .. import CorpusConfig, Segmentor, Tokenizer
 from .._config_objects import WordEmbeddingCollection
 from .._ops import SplitEnglish
 
@@ -28,11 +28,6 @@ def corpus_config(data_dir: pathlib.Path):
         embedding_path=data_dir / 'en_fasttext_word2vec_V100D20.json',
         segmentor=Segmentor(split_token=' ', operators=[SplitEnglish(type='split-english')]),
     )
-
-
-def test_uttut_preprocessor(corpus_config):
-    data_collection, _ = Preprocessor(corpus_config).preprocess()
-    assert data_collection['train'].ids.shape[1] == corpus_config.maxlen
 
 
 class TestWordEmbeddingCollection:
