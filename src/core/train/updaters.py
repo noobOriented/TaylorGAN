@@ -44,7 +44,7 @@ class ModuleUpdater(Channel):
 
     @property
     def info(self):
-        return f"{self.module.scope[0]} {self.module}"
+        return f"{self.module.scope[0]} {str(self.module).splitlines()[0]}"  # FIXME
 
     def summary(self):
         with logging_indent(self.module.scope):

@@ -52,5 +52,4 @@ class DataLoader:
             self.dataset,
             batch_size=self.batch_size,
             shuffle=True,
-            full_batch_only=True,
         )

@@ -1,61 +1,115 @@
+import pathlib
 import typing as t
-from functools import partialmethod
 
-from core.evaluate import TextGenerator
-from library.utils import logging_indent, reuse_method_call
+import numpy as np
+import termcolor
 
-from ..pubsub import Channel
+from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction, TextGenerator
+from core.preprocess import PreprocessResult
+from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
+
+from ..pubsub import register_channel
 from .base import Callback
 
 
 class TextEvaluator(Callback):
 
-    def __init__(self, generator: TextGenerator):
-        self.on_batch_end = EvaluateCommander(generator)
-        self.on_epoch_end = EvaluateCommander(generator)
-
-    def summary(self):
-        with logging_indent(self.__class__.__name__):
-            for method_name in ('on_batch_end', 'on_epoch_end'):
-                with logging_indent(method_name):
-                    getattr(self, method_name).summary()
-
-
-class EvaluateCommander:
-
-    def __init__(self, generator: TextGenerator, /):
+    def __init__(self, generator: TextGenerator, eos_idx: int, real_samples: t.Sequence[str]):
         self.generator = generator
-        self._command_list = []
+        self.eos_idx = eos_idx
+        self.real_samples = real_samples
+        self.channel = register_channel('samples')
 
-    def __call__(self, step, *_):
-        with reuse_method_call(self.generator, ['generate_ids', 'generate_texts']) as generator:
-            for command in self._command_list:
-                command(generator, step)
+    def on_batch_end(self, batch: int, batch_data):
+        if batch % 10 == 0:
+            ids = self.generator.generate_ids(10)
+            mean_length = np.mean(get_seqlens(ids, self.eos_idx))
+            self.channel.notify(batch, {'mean_length': mean_length})
 
-    def _evaluate(
+        if batch % 100 == 0:
+            sentenses = self.generator.generate_texts(3)
+            print(SEPARATION_LINE)
+            print()
+            print(termcolor.colored("Real Sentences (Random Sampled):", 'blue'))
+            self._print_samples(random_sample(self.real_samples, len(sentenses)))
+            print()
+            print(termcolor.colored("Fake Sentences (Random Sampled):", 'red'))
+            self._print_samples(sentenses)
+            print()
+
+    def _print_samples(self, texts: t.Sequence[str], /):
+        for i, line in enumerate(texts, 1):
+            print(f"{i}.")
+            print(line)
+
+
+class BLEUEvaluator(Callback):
+
+    def __init__(
         self,
-        evaluator: t.Callable,
+        data: PreprocessResult,
+        generator: TextGenerator,
+        max_gram: int,
         sample_size: int,
-        on_text: bool,
-        channel: Channel | None = None,
-        period: int = 1,
+        period: int = 10,
     ):
-        def command(generator: TextGenerator, step):  # late bind generator to allow cache
-            if step % period != 0:
-                return
+        self.channels = {}
+        self.calculators: dict[str, BLEUCalculator] = {}
+        for tag, dataset in data.dataset.items():
+            with logging_indent(f"Building '{tag}' data BLEU table..."):
+                self.calculators[tag] = BLEUCalculator(
+                    dataset.ids,
+                    cache_dir=pathlib.Path(data.cache_key, f'{tag}_BLEU'),
+                    verbose=True,
+                    max_gram=max_gram,
+                    eos_idx=data.special_tokens.EOS.idx,
+                    smoothing=SmoothingFunction.fuzz_smoothing,
+                )
+                self.channels[tag] = register_channel(tag)
 
-            foo = generator.generate_texts if on_text else generator.generate_ids
-            samples = foo(sample_size)
-            result = evaluator(samples)
-            if channel:
-                channel.notify(step, result)
+        self.max_gram = max_gram
+        self.generator = generator
+        self.sample_size = sample_size
+        self.period = period
+        self.selfbleu_sample_size = len(data.dataset['train'])
+        self.eos_idx = data.special_tokens.EOS.idx
 
-        command._info = f"{evaluator.__name__} on {sample_size} samples, every {period} steps"
-        self._command_list.append(command)
+    def on_batch_end(self, batch: int, batch_data):
+        if batch % self.period == 0:
+            ids = self.generator.generate_ids(self.sample_size)
+            for tag, c in self.calculators.items():
+                result = c.mean_bleu(ids)
+                self.channels[tag].notify(batch, result)
 
-    def summary(self):
-        for command in self._command_list:
-            print(command._info)
+    def on_epoch_end(self, epoch: int):
+        ids = self.generator.generate_ids(self.selfbleu_sample_size)
 
-    evaluate_ids = partialmethod(_evaluate, on_text=False)
-    evaluate_texts = partialmethod(_evaluate, on_text=True)
+        # print("Evaluating generated data SelfBLEU...")
+        # print()
+        selfbleu = BLEUCalculator.selfbleu(
+            ids,
+            max_gram=self.max_gram,
+            eos_idx=self.eos_idx,
+            smoothing=SmoothingFunction.fuzz_smoothing,
+        )
+        register_channel('samples').notify(epoch, selfbleu)
+
+
+class FEDEvaluator(Callback):
+    
+    def __init__(self, generator: TextGenerator, data: PreprocessResult, sample_size: int) -> None:
+        self.generator = generator
+        self.sample_size = sample_size
+        self.calculators: dict[str, FEDCalculator] = {}
+        for tag, dataset in data.dataset.items():
+            print(f"Building '{tag}' data FED sentence encoder...")
+            self.calculators[tag] = FEDCalculator(
+                hub_url="https://tfhub.dev/google/universal-sentence-encoder-large/3",
+                references=random_sample(dataset.texts, size=sample_size),
+            )
+
+    def on_epoch_end(self, epoch: int):
+        texts = self.generator.generate_texts(self.sample_size)
+        for tag, c in self.calculators.items():
+            d = {'FED': c.calculate_fed_score(texts)}
+            register_channel(tag).notify(epoch, d)

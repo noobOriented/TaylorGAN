@@ -85,7 +85,7 @@ class Tokenizer(pydantic.BaseModel):
         tokens = more_itertools.take(self.maxlen, tokens)
         return [self._token2index.get(s, self.special_tokens.UNK.idx) for s in tokens]
 
-    def ids_to_text(self, ids: t.Sequence[int]) -> str:
+    def ids_to_text(self, ids: t.Sequence[int], /) -> str:
         return self.segmentor.join_text(
             self.tokens[idx]
             for idx in itertools.takewhile(lambda x: x != self.special_tokens.EOS.idx, ids)

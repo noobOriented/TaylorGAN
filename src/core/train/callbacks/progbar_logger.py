@@ -95,10 +95,10 @@ class _MetricsBar:
         # https://github.com/tqdm/tqdm/blob/master/tqdm/_tqdm.py#L255-L457
         @staticmethod
         def format_meter(
-                n, total, elapsed, ncols=None, prefix='', ascii=False,  # noqa: A002
-                unit='it', unit_scale=False, rate=None, bar_format=None,
-                postfix=None, unit_divisor=1000, **extra_kwargs,
-            ):
+            n, total, elapsed, ncols=None, prefix='', ascii=False,  # noqa: A002
+            unit='it', unit_scale=False, rate=None, bar_format=None,
+            postfix=None, unit_divisor=1000, **extra_kwargs,
+        ):
             if prefix:
                 prefix = prefix + ': '
             if not postfix:

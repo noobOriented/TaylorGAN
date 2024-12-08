@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 import torch
 
 from core.models import Generator
@@ -16,12 +17,12 @@ class TextGenerator:
         self._tokenizer = tokenizer
 
     def generate_texts(self, size: int, temperature: float = 1.) -> list[str]:
-        return list(map(
-            self._tokenizer.ids_to_text,
-            self.generate_ids(size, temperature),
-        ))
+        return [
+            self._tokenizer.ids_to_text(ids)
+            for ids in self.generate_ids(size, temperature)
+        ]
 
-    def generate_ids(self, size: int, temperature: float = 1.) -> np.ndarray:
+    def generate_ids(self, size: int, temperature: float = 1.) -> npt.NDArray[np.uint8]:
         return np.concatenate(
             [
                 self.generator.forward(
