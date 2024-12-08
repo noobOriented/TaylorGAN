@@ -67,6 +67,7 @@ class BLEUEvaluator(Callback):
                 )
                 self.channels[tag] = register_channel(tag)
 
+        self.channels['samples'] = register_channel('samples')
         self.max_gram = max_gram
         self.generator = generator
         self.sample_size = sample_size
@@ -84,15 +85,15 @@ class BLEUEvaluator(Callback):
     def on_epoch_end(self, epoch: int):
         ids = self.generator.generate_ids(self.selfbleu_sample_size)
 
-        # print("Evaluating generated data SelfBLEU...")
-        # print()
+        print("Evaluating generated data SelfBLEU...")
+        print()
         selfbleu = BLEUCalculator.selfbleu(
             ids,
             max_gram=self.max_gram,
             eos_idx=self.eos_idx,
             smoothing=SmoothingFunction.fuzz_smoothing,
         )
-        register_channel('samples').notify(epoch, selfbleu)
+        self.channels['samples'].notify(epoch, selfbleu)
 
 
 class FEDEvaluator(Callback):

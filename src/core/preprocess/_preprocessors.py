@@ -115,12 +115,12 @@ class Tokenizer(pydantic.BaseModel):
         )
 
     def summary(self):
-        with logging_indent(f"{self.__class__.__name__} summary:"):
-            print(f"Maxlen: {self.maxlen}.")
-            print(f"Vocabulary size: {len(self.tokens)}.")
-            with logging_indent("Special tokens config:"):
-                for idx, token in self.special_tokens.__members__.items():
-                    print(f"{token.name} token: '{token}', index: {idx}.")
+        with logging_indent(f'{self.__class__.__name__} summary:'):
+            print(f'Maxlen: {self.maxlen}.')
+            print(f'Vocabulary size: {len(self.tokens)}.')
+            with logging_indent('Special tokens:'):
+                for name, token in self.special_tokens.__members__.items():
+                    print(f"{name}: token = '{token.value}', index = {token.idx}.")
 
     @functools.cached_property
     def _token2index(self):

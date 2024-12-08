@@ -2,19 +2,15 @@ from __future__ import annotations
 
 import typing as t
 
-from tqdm import tqdm
+import tqdm
 
 from core.train.updaters import ModuleUpdater
-from library.utils import ExponentialMovingAverageMeter, format_highlight2, left_aligned
-from library.utils.logging import SEPARATION_LINE, TqdmRedirector
+from library.utils import (
+    SEPARATION_LINE, ExponentialMovingAverageMeter, TqdmRedirector, format_highlight2, left_aligned,
+)
 
 from ..pubsub import CHANNELS
 from .base import Callback
-
-
-class _Bar(t.Protocol):
-    def close(self):
-        ...
 
 
 class ProgbarLogger(Callback):
@@ -23,7 +19,7 @@ class ProgbarLogger(Callback):
         self.desc = format_highlight2(desc)
         self.total = total
         self._updaters = updaters
-        self._bars: list[_Bar] = []
+        self._bars: list[tqdm.tqdm] = []
 
     def on_train_begin(self, is_restored: bool):
         TqdmRedirector.enable()
@@ -33,24 +29,28 @@ class ProgbarLogger(Callback):
             desc=self.desc,
         )
         for updater in self._updaters:
-            updater.attach_subscriber(self._add_bar(_ModuleBar, desc=updater.info))
+            pbar = self._add_bar(desc=updater.info)
+            pbar.format_meter = _format_meter_for_losses
+            ema_meter = ExponentialMovingAverageMeter(decay=0.9)
+
+            @updater.attach_subscriber
+            def update_losses(step, losses, pbar=pbar, ema_meter=ema_meter):
+                if step > pbar.n:
+                    pbar.update(step - pbar.n)
+                pbar.set_postfix(ema_meter.apply(**losses))
 
         self._add_bar(bar_format=SEPARATION_LINE)
 
         for channel, m_aligned in zip(CHANNELS.values(), left_aligned(CHANNELS.keys())):
-            channel.attach_subscriber(self._add_bar(_MetricsBar, desc=m_aligned))
+            pbar = self._add_bar(desc=m_aligned)
+            pbar.format_meter = _format_meter_for_metrics
+            ema_meter = ExponentialMovingAverageMeter(decay=0.)  # to persist logged values
+
+            @channel.attach_subscriber
+            def update_metrics(step, vals, pbar=pbar, ema_meter=ema_meter):
+                pbar.set_postfix(ema_meter.apply(**vals))
 
         self._add_bar(bar_format=SEPARATION_LINE)
-
-    def _add_bar[T: _Bar](self, bar_cls: type[T] = tqdm, **kwargs) -> T:
-        bar = bar_cls(
-            file=TqdmRedirector.STDOUT,  # use original stdout port
-            dynamic_ncols=True,
-            position=-len(self._bars),
-            **kwargs,
-        )
-        self._bars.append(bar)
-        return bar
 
     def on_epoch_begin(self, epoch):
         self.body = self._add_bar(
@@ -75,63 +75,28 @@ class ProgbarLogger(Callback):
             bar.close()
         TqdmRedirector.disable()
 
-
-class _MetricsBar:
-
-    def __init__(self, desc: str, **kwargs):
-        self.pbar = self._PostfixBar(desc=desc, unit="step", **kwargs)
-        self.ema_meter = ExponentialMovingAverageMeter(decay=0.)  # to persist logged values
-
-    def update(self, step, vals):
-        smoothed_vals = self.ema_meter.apply(**vals)
-        self.pbar.set_postfix(smoothed_vals)
-
-    def close(self):
-        self.pbar.close()
-
-    class _PostfixBar(tqdm):
-
-        # HACK override: remove the leading `,` of postfix
-        # https://github.com/tqdm/tqdm/blob/master/tqdm/_tqdm.py#L255-L457
-        @staticmethod
-        def format_meter(
-            n, total, elapsed, ncols=None, prefix='', ascii=False,  # noqa: A002
-            unit='it', unit_scale=False, rate=None, bar_format=None,
-            postfix=None, unit_divisor=1000, **extra_kwargs,
-        ):
-            if prefix:
-                prefix = prefix + ': '
-            if not postfix:
-                postfix = 'nan'
-            return f"{prefix}{postfix}"
+    def _add_bar(self, **kwargs):
+        bar = tqdm.tqdm(
+            file=TqdmRedirector.STDOUT,  # use original stdout port
+            dynamic_ncols=True,
+            position=-len(self._bars),
+            **kwargs,
+        )
+        self._bars.append(bar)
+        return bar
 
 
-class _ModuleBar:
+# HACK override: remove the leading `,` of postfix
+# https://github.com/tqdm/tqdm/blob/master/tqdm/_tqdm.py#L255-L457
+def _format_meter_for_metrics(*, prefix='', postfix=None, **kwargs):
+    if prefix:
+        prefix = prefix + ': '
+    if not postfix:
+        postfix = 'nan'
+    return f"{prefix}{postfix}"
 
-    def __init__(self, desc: str, **kwargs):
-        self.pbar = self._ModuleBar(desc=desc, **kwargs)
-        self.ema_meter = ExponentialMovingAverageMeter(decay=0.9)
 
-    def update(self, step, losses):
-        if step > self.pbar.n:
-            self.pbar.update(step - self.pbar.n)
-
-        smoothed_losses = self.ema_meter.apply(**losses)
-        self.pbar.set_postfix(smoothed_losses)
-
-    def close(self):
-        self.pbar.close()
-
-    class _ModuleBar(tqdm):
-
-        # HACK override: remove the leading `,` of postfix
-        # https://github.com/tqdm/tqdm/blob/master/tqdm/_tqdm.py#L255-L457
-        @staticmethod
-        def format_meter(
-            n, total, elapsed, ncols=None, prefix='', ascii=False,  # noqa: A002
-            unit='it', unit_scale=False, rate=None, bar_format=None,
-            postfix=None, unit_divisor=1000, **extra_kwargs,
-        ):
-            if not postfix:
-                return f"{prefix} steps: {n}"
-            return f"{prefix} steps: {n}, losses: [{postfix}]"
+def _format_meter_for_losses(*, n, prefix='', postfix=None, **kwargs):
+    if not postfix:
+        return f"{prefix} steps: {n}"
+    return f"{prefix} steps: {n}, losses: [{postfix}]"

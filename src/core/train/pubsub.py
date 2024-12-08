@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import abc
 import typing as t
 
 
@@ -13,8 +12,7 @@ def register_channel(key: str) -> Channel:
 
 class Subscriber(t.Protocol):
 
-    @abc.abstractmethod
-    def update(self, step: int, vals: t.Mapping[str, float], /):
+    def __call__(self, step: int, vals: t.Mapping[str, float], /):
         ...
 
 
@@ -23,9 +21,10 @@ class Channel:
     def __init__(self):
         self._subscribers: list[Subscriber] = []
 
-    def attach_subscriber(self, subcriber: Subscriber, /):
+    def attach_subscriber[T: Subscriber](self, subcriber: T, /) -> T:
         self._subscribers.append(subcriber)
+        return subcriber
 
     def notify(self, step: int, vals: t.Mapping[str, float]):
         for s in self._subscribers:
-            s.update(step, vals)
+            s(step, vals)
