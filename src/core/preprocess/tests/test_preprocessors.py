@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 
 from .. import CorpusConfig, Segmentor, Tokenizer
-from .._config_objects import WordEmbeddingCollection
-from .._ops import SplitEnglish
+from .._configs import WordEmbeddingCollection
+from .._segmentor import SplitEnglish
 
 
 @pytest.fixture(scope='session')

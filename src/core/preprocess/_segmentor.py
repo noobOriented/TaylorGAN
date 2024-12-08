@@ -1,9 +1,24 @@
+from __future__ import annotations
+
 import re
 import typing as t
 import unicodedata
 
 import more_itertools
 import pydantic
+
+
+class Segmentor(pydantic.BaseModel):
+    split_token: str = ' '
+    operators: list[Operator]
+
+    def segmentize_text(self, s: str) -> list[str]:
+        for op in self.operators:
+            s = op(s)
+        return s
+
+    def join_text(self, texts: t.Iterable[str]) -> str:
+        return self.split_token.join(texts)
 
 
 class Lower(pydantic.BaseModel):

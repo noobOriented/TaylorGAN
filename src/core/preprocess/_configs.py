@@ -7,7 +7,8 @@ import numpy.typing as npt
 import pydantic
 
 from library.utils import logging_indent, tqdm_open
-from ._ops import Operator
+
+from ._segmentor import Segmentor
 
 
 class WordEmbeddingCollection(pydantic.BaseModel):
@@ -28,19 +29,6 @@ class WordEmbeddingCollection(pydantic.BaseModel):
         if (index := self.token2index.get(self.UNK)) is not None:
             return self.vectors[index]
         return np.zeros_like(self.vectors[0])
-
-
-class Segmentor(pydantic.BaseModel):
-    split_token: str = ' '
-    operators: list[Operator]
-
-    def segmentize_text(self, s: str) -> list[str]:
-        for op in self.operators:
-            s = op(s)
-        return s
-
-    def join_text(self, texts: list[str]) -> str:
-        return self.split_token.join(texts)
 
 
 class CorpusConfig(pydantic.BaseModel):

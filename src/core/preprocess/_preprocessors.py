@@ -15,7 +15,7 @@ import pydantic
 from core.cache import cache_center
 from library.utils import format_path, logging_indent
 
-from ._config_objects import CorpusConfig, Segmentor, SpecialTokenConfig, WordEmbeddingCollection
+from ._configs import CorpusConfig, Segmentor, SpecialTokenConfig, WordEmbeddingCollection
 
 
 @dataclasses.dataclass
@@ -73,14 +73,14 @@ class Tokenizer(pydantic.BaseModel):
         tokens.append(self.special_token_config.eos.token)
         tokens = more_itertools.padded(tokens, self.special_token_config.pad.token)
         tokens = more_itertools.take(self.maxlen, tokens)
-        return [
-            self._token2index.get(s, self.special_token_config.unk.idx)
-            for s in tokens
-        ]
+        unk_idx = self.special_token_config.unk.idx
+        return [self._token2index.get(s, unk_idx) for s in tokens]
 
     def ids_to_text(self, ids: t.Sequence[int]) -> str:
-        tokens = [self.tokens[idx] for idx in itertools.takewhile(lambda x: x != self.eos_idx, ids)]
-        return self.segmentor.join_text(tokens)
+        return self.segmentor.join_text(
+            self.tokens[idx]
+            for idx in itertools.takewhile(lambda x: x != self.eos_idx, ids)
+        )
 
     @classmethod
     def fit_corpus(cls, corpus_config: CorpusConfig):
