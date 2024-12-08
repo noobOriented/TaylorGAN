@@ -1,7 +1,6 @@
 import os
 
 from core.train import DataLoader, ModelCheckpointSaver
-from factories import callback_factory
 from library.utils import logging_indent, parse_args_as
 from scripts.snippets import set_global_random_seed
 
@@ -20,7 +19,7 @@ def MLE_main():
 
 def main(
     configs: GANTrainingConfigs | MLETrainingConfigs,
-    base_tag=None,
+    base_tag: str | None = None,
     checkpoint: str | os.PathLike[str] | None = None,
 ):
     with logging_indent("Set global random seed"):
@@ -38,8 +37,7 @@ def main(
         trainer.summary()
 
     with logging_indent("Prepare Callback"):
-        callback = callback_factory.create(
-            configs,
+        callback = configs.get_callback(
             data=preprocessed_result,
             generator=generator,
             trainer=trainer,

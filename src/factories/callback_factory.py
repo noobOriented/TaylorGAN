@@ -8,6 +8,7 @@ import typing as t
 import warnings
 
 import numpy as np
+import pydantic
 import termcolor
 import torch
 
@@ -20,52 +21,62 @@ from core.train.pubsub import METRIC_CHANNELS, register_channel
 from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
 
 
-def create(
-    args: _Args,
-    trainer: Trainer,
-    generator: Generator,
-    data: PreprocessResult,
-    checkpoint: str | os.PathLike[str] | None = None,
-    base_tag: str | None = None,
-):
-    creator = _CallbackCreator(
-        args,
-        data=data,
-        generator=generator,
-        trainer=trainer,
-        checkpoint=checkpoint,
-        base_tag=base_tag,
-    )
-    creator.attach_events()
-    return creator.callback
-
-
-class _Args(t.Protocol):
-    batch_size: int
+class CallbackConfigs(pydantic.BaseModel):
+    batch_size: t.Annotated[int, pydantic.Field(ge=1, description='size of data mini-batch.')] = 64
 
     # Evaluate
-    bleu: int | None
-    fed: int | None
+    bleu: t.Annotated[
+        int | None,
+        pydantic.Field(ge=1, le=5, description='longest n-gram to calculate BLEU/SelfBLEU score.'),
+    ] = 5
+    fed: t.Annotated[
+        int | None,
+        pydantic.Field(description='number of sample size for FED score.'),
+    ] = None
 
     # Save
-    checkpoint_root: pathlib.Path | None
-    serving_root: pathlib.Path | None
-    save_period: int
+    checkpoint_root: pathlib.Path | None = None
+    serving_root: pathlib.Path | None = None
+    save_period: pydantic.PositiveInt = 1
 
     # Logging
-    tensorboard: pathlib.Path | None
-    tags: list[str]
+    tensorboard: t.Annotated[
+        pathlib.Path | None,
+        pydantic.Field(description='whether to log experiment on tensorboard.')
+    ] = None
+    tags: t.Annotated[
+        list[str],
+        pydantic.Field(description='additional tags to configure this training (will be used in tensorboard).'),
+    ] = []
 
     # Dev
-    profile: pathlib.Path | None
+    profile: pathlib.Path | None = None
 
+    def get_callback(
+        self,
+        trainer: Trainer,
+        generator: Generator,
+        data: PreprocessResult,
+        checkpoint: str | os.PathLike[str] | None = None,
+        base_tag: str | None = None,
+    ):
+        creator = _CallbackCreator(
+            self,
+            data=data,
+            generator=generator,
+            trainer=trainer,
+            checkpoint=checkpoint,
+            base_tag=base_tag,
+        )
+        creator.attach_events()
+        return creator.callback
 
 
 class _CallbackCreator:
 
     def __init__(
         self,
-        args: _Args,
+        args: CallbackConfigs,
         generator: Generator,
         trainer: Trainer,
         data: PreprocessResult,
@@ -209,7 +220,7 @@ class _CallbackCreator:
             writer = SummaryWriter(logdir=str(logdir))
 
             @self.callback.on_train_begin.attach
-            def on_train_begin(is_restored: bool):
+            def on_train_begin():
                 logdir.mkdir(exist_ok=True)
                 writer.add_text(
                     'restore_args' if self.checkpoint else 'args',
