@@ -4,10 +4,10 @@ import typing as t
 import torch
 
 from core.objectives.collections import LossCollection
-from library.utils import FormatableMixin
+from library.utils import format_object
 
 
-class GANObjective(FormatableMixin):
+class GANObjective:
 
     def __init__(self, discriminator, generator_loss, estimator):
         self.discriminator = discriminator
@@ -22,15 +22,18 @@ class GANObjective(FormatableMixin):
             generator_loss=self.generator_loss,
         )
 
-    def get_config(self):
-        return {'estimator': self.estimator}
+    def __str__(self):
+        return format_object(self, estimator=self.estimator)
 
 
-class GANEstimator(abc.ABC, FormatableMixin):
+class GANEstimator(abc.ABC):
 
     @abc.abstractmethod
     def compute_loss(self, fake_samples, discriminator, generator_loss):
-        pass
+        ...
+
+    def __str__(self):
+        return format_object(self)
 
 
 class GANLossTuple:

@@ -5,7 +5,7 @@ import typing as t
 import tqdm
 
 from library.utils import (
-    SEPARATION_LINE, ExponentialMovingAverageMeter, TqdmRedirector, format_highlight2, left_aligned,
+    SEPARATION_LINE, ExponentialMovingAverageMeter, TqdmRedirector, format_highlight, left_aligned,
 )
 
 from .pubsub import EventHook
@@ -20,7 +20,7 @@ class ProgbarLogger:
         module_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]] | None = None,
         metric_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]] | None = None,
     ):
-        self.desc = format_highlight2(desc)
+        self.desc = format_highlight(desc, 1)
         self.total = total
         self._module_hooks = module_update_hooks or {}
         self._metric_hooks = metric_update_hooks or {}

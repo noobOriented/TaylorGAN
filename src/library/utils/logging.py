@@ -8,7 +8,7 @@ import termcolor
 from tqdm import tqdm
 from tqdm.contrib import DummyTqdmFile
 
-from .format_utils import format_highlight, format_highlight2
+from .format_utils import format_highlight
 
 
 STDOUT, STDERR, PRINT = sys.stdout, sys.stderr, builtins.print  # guaranteed builtins!!
@@ -46,7 +46,7 @@ class _IndentPrinter:
         if cls.level == 0:
             print(format_highlight(header))
         elif cls.level == 1:
-            print(format_highlight2(header))
+            print(format_highlight(header, 1))
         else:
             print(header)
 

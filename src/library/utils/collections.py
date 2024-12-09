@@ -3,14 +3,13 @@ from functools import reduce
 
 
 def counter_or(dicts: t.Iterable[dict[t.Any, int]]):
-    return reduce(counter_ior, dicts, {})
+    return reduce(_counter_ior, dicts, {})
 
 
-def counter_ior(a: dict[t.Any, int], b: dict[t.Any, int]):
+def _counter_ior(a: dict[t.Any, int], b: dict[t.Any, int]):
     # NOTE much faster than Counter() |
     for key, cnt in b.items():
-        if cnt > a.get(key, 0):
-            a[key] = cnt
+        a[key] = max(cnt, a.get(key, cnt))
     return a
 
 
