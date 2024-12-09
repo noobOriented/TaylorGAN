@@ -76,4 +76,8 @@ class DataConfigs(pydantic.BaseModel):
 
     @functools.cached_property
     def _cache_key(self) -> str:
-        return '_'.join(map(str, self.model_dump(exclude_none=True).values()))
+        include = set(DataConfigs.model_fields.keys())
+        return '_'.join(map(
+            str,
+            self.model_dump(include=include, exclude_none=True).values()
+        ))

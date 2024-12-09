@@ -1,251 +1,296 @@
 from __future__ import annotations
 
-import functools
+import collections
+import os
 import pathlib
+import sys
 import time
 import typing as t
 import warnings
 
 import numpy as np
-from termcolor import colored
+import pydantic
+import termcolor
+import torch
 
-from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction, TextGenerator
+from core.evaluate import TextGenerator
 from core.models.generators import Generator
 from core.preprocess import PreprocessResult
-from core.train.callbacks import (
-    CallbackList, ModelCheckpoint, ModelSaver, ProgbarLogger,
-    TensorBoardXWritter, TextEvaluator, TrainProfiler,
-)
-from core.train.callbacks.channels import register_channel
-from core.train.trainers import Trainer
+from core.train import Callback, EventHook, ModelCheckpointSaver, Trainer
+from core.train.loggers import ProgbarLogger
 from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
 
 
-def create(
-    args: _Args,
-    trainer: Trainer,
-    generator: Generator,
-    data: PreprocessResult,
-    base_tag: str | None = None,
-):
-    base_tag = base_tag or f"{args.dataset}@{time.strftime('%Y%m%d-%H%M%S')}"
-    creator = _CallbackCreator(
-        generator=generator,
-        data=data,
-        tags=args.tags + [base_tag],
-    )
-
-    callback_list = CallbackList([
-        creator.create_evaluator(
-            bleu_n_gram=args.bleu,
-            sample_size=args.batch_size,
-            fed_sample_size=args.fed,
-        ),
-        *creator.create_loggers(
-            updaters=trainer.updaters,
-            tensorboard_logdir=args.tensorboard,
-        ),
-        *creator.create_savers(
-            args,
-            trainer=trainer,
-            serving_root=args.serving_root,
-            checkpoint_root=args.checkpoint_root,
-            period=args.save_period,
-        ),
-        *creator.create_profiler(args.profile),
-    ])
-    callback_list.summary()
-    return callback_list
-
-
-class _Args(t.Protocol):
-    dataset: str
-    batch_size: int
+class CallbackConfigs(pydantic.BaseModel):
+    batch_size: t.Annotated[int, pydantic.Field(ge=1, description='size of data mini-batch.')] = 64
 
     # Evaluate
-    bleu: int | None
-    fed: int | None
+    bleu: t.Annotated[
+        int | None,
+        pydantic.Field(ge=1, le=5, description='longest n-gram to calculate BLEU/SelfBLEU score.'),
+    ] = 5
+    fed: t.Annotated[
+        int | None,
+        pydantic.Field(description='number of sample size for FED score.'),
+    ] = None
 
     # Save
-    checkpoint_root: pathlib.Path | None
-    serving_root: pathlib.Path | None
-    save_period: int
+    checkpoint_root: pathlib.Path | None = None
+    serving_root: pathlib.Path | None = None
+    save_period: pydantic.PositiveInt = 1
 
     # Logging
-    tensorboard: pathlib.Path | None
-    tags: list[str]
+    tensorboard: t.Annotated[
+        pathlib.Path | None,
+        pydantic.Field(description='whether to log experiment on tensorboard.')
+    ] = None
+    tags: t.Annotated[
+        list[str],
+        pydantic.Field(description='additional tags to configure this training (will be used in tensorboard).'),
+    ] = []
 
     # Dev
-    profile: pathlib.Path | None
+    profile: pathlib.Path | None = None
 
+    def get_callback(
+        self,
+        trainer: Trainer,
+        generator: Generator,
+        data: PreprocessResult,
+        checkpoint: str | os.PathLike[str] | None = None,
+        base_tag: str | None = None,
+    ):
+        creator = _CallbackCreator(
+            self,
+            data=data,
+            generator=generator,
+            trainer=trainer,
+            checkpoint=checkpoint,
+            base_tag=base_tag,
+        )
+        creator.attach_events()
+        return creator.callback
 
 
 class _CallbackCreator:
 
-    def __init__(self, generator, data: PreprocessResult, tags: list[str]):
-        self.generator = generator
-        self.data = data
-        self.tag = pathlib.Path(*tags)
-
-    def create_evaluator(self, bleu_n_gram: int | None, sample_size: int, fed_sample_size: int | None):
-        return EvaluatorCreator(
-            text_generator=self.text_generator,
-            data=self.data,
-        ).create(bleu_n_gram, sample_size, fed_sample_size)
-
-    def create_loggers(self, updaters, tensorboard_logdir: pathlib.Path | None):
-        yield ProgbarLogger(
-            desc=str(self.tag),
-            total=len(self.data.dataset['train']),
-            updaters=updaters,
-        )
-        if tensorboard_logdir:
-            yield TensorBoardXWritter(
-                updaters=updaters,
-                logdir=tensorboard_logdir / self.tag,
-                log_period=10,
-            )
-
-    def create_savers(
+    def __init__(
         self,
-        args,
-        trainer,
-        serving_root: pathlib.Path | None,
-        checkpoint_root: pathlib.Path | None,
-        period: int,
+        args: CallbackConfigs,
+        generator: Generator,
+        trainer: Trainer,
+        data: PreprocessResult,
+        checkpoint: str | os.PathLike[str] | None,
+        base_tag: str | None = None,
     ):
-        if serving_root:
-            serving_dir = serving_root / self.tag
-            serving_dir.mkdir(exist_ok=True)
-            with open(serving_dir / 'tokenizer.json', 'w') as f:
-                f.write(self.data.tokenizer.model_dump_json())
-            yield ModelSaver(
-                module=self.text_generator,
-                directory=serving_dir,
-                period=period,
-            )
-
-        if checkpoint_root:
-            yield ModelCheckpoint(
-                args,
-                trainer=trainer,
-                directory=checkpoint_root / self.tag,
-                period=period,
-            )
-        else:
-            warnings.warn("`checkpoint_root` is not given. Training can't be restored!")
-
-    def create_profiler(self, export_path: pathlib.Path | None):
-        if export_path:
-            yield TrainProfiler(
-                warm_up=100,
-                duration=200,
-                export_filepath=export_path,
-                stop_training_when_finish=True,
-            )
-
-    @functools.cached_property
-    def text_generator(self):
-        return TextGenerator(self.generator, tokenizer=self.data.tokenizer)
-
-
-class EvaluatorCreator:
-
-    def __init__(self, text_generator, data: PreprocessResult):
-        self.text_generator = text_generator
+        self.args = args
         self.data = data
+        self.generator = generator
+        self.trainer = trainer
+        self.checkpoint = checkpoint
+        self.callback = Callback()
 
-    def create(self, bleu_n_gram: int | None, sample_size: int, fed_sample_size: int | None):
-        evaluator = TextEvaluator(self.text_generator)
-        self._attach_basic(sample_size, evaluator)
-        if bleu_n_gram is not None:
-            self._attach_bleu(bleu_n_gram, sample_size, evaluator)
-        if fed_sample_size is not None:
-            self._attach_fed(fed_sample_size, evaluator)
-        return evaluator
+        base_tag = base_tag or f"{data.cache_key}@{time.strftime('%Y%m%d-%H%M%S')}"
+        self.tag = pathlib.Path(*self.args.tags, base_tag)
+        self.text_generator = TextGenerator(self.generator, tokenizer=self.data.tokenizer)
+        self.metric_channels = collections.defaultdict(EventHook[int, t.Mapping[str, float]])
 
-    def _attach_basic(self, sample_size, evaluator):
+    def attach_events(self):
+        self._attach_evaluators()
+        self._attach_loggers()
+        self._attach_savers()
 
-        def mean_length(word_ids):
-            return {'mean_length': np.mean(get_seqlens(word_ids, self.data.special_tokens.EOS.idx))}
+        if export_path := self.args.profile:
+            import cProfile
+            import pstats
+            profile = cProfile.Profile(subcalls=False)
+            warm_up = 100
+            duration = 200
 
-        def log_texts(texts: list[str]):
-            print(SEPARATION_LINE)
-            print()
-            print(colored("Real Sentences (Random Sampled):", 'blue'))
-            print_samples(random_sample(self.data.dataset['train'].texts, len(texts)))
-            print()
-            print(colored("Fake Sentences (Random Sampled):", 'red'))
-            print_samples(texts)
-            print()
+            @self.callback.on_batch_begin.attach
+            def enable_profile(batch: int):
+                if batch == 100:
+                    print(f"Updates {warm_up} times.")
+                    print("Complete warm-up, start profiling.")
+                    profile.enable()
 
-        evaluator.on_batch_end.evaluate_ids(
-            mean_length,
-            sample_size=sample_size,
-            channel=register_channel('samples'),
-            period=10,
-        )
-        evaluator.on_batch_end.evaluate_texts(
-            log_texts,
-            sample_size=3,
-            period=100,
-        )
+            @self.callback.on_batch_end.attach
+            def disable_profile(batch: int, _):
+                if batch != warm_up + duration:
+                    return
 
-    def _attach_bleu(self, max_gram, sample_size, evaluator):
-        for tag, dataset in self.data.dataset.items():
-            with logging_indent(f"Building '{tag}' data BLEU table..."):
-                calculator = BLEUCalculator(
-                    dataset.ids,
-                    cache_dir=pathlib.Path(self.data.cache_key, f'{tag}_BLEU'),
-                    verbose=True,
-                    max_gram=max_gram,
+                profile.disable()
+                print(f"Updates {warm_up} + {duration} times.")
+                print(f"Complete profiling, export stats to {export_path}")
+                with open(export_path, 'w') as f_out:
+                    stats = pstats.Stats(profile, stream=f_out)
+                    stats.strip_dirs().sort_stats('cumtime').print_stats()
+
+                print("Exit by TrainProfiler.")
+                sys.exit(0)
+
+    def _attach_evaluators(self):
+
+        @self.trainer.generator_updater.hook.attach
+        def calculate_mean_length(batch: int, _, hook=self.metric_channels['samples']):
+            if batch % 10 == 0:
+                ids = self.text_generator.generate_ids(10)
+                mean_length = np.mean(get_seqlens(ids, self.data.special_tokens.EOS.idx))
+                hook(batch, {'mean_length': float(mean_length)})
+
+        @self.trainer.generator_updater.hook.attach
+        def log_texts(batch: int, _):
+            if batch % 100 == 0:
+                sentences = self.text_generator.generate_texts(3)
+                print(SEPARATION_LINE)
+                print()
+                print(termcolor.colored("Real Sentences (Random Sampled):", 'blue'))
+                _print_samples(random_sample(self.data.dataset['train'].texts, len(sentences)))
+                print()
+                print(termcolor.colored("Fake Sentences (Random Sampled):", 'red'))
+                _print_samples(sentences)
+                print()
+
+        if ngram := self.args.bleu:
+            from core.evaluate import BLEUCalculator, SmoothingFunction
+
+            for tag, dataset in self.data.dataset.items():
+                with logging_indent(f"Building '{tag}' data BLEU table..."):
+                    calculator = BLEUCalculator(
+                        dataset.ids,
+                        cache_dir=pathlib.Path(self.data.cache_key, f'{tag}_BLEU'),
+                        verbose=True,
+                        max_gram=ngram,
+                        eos_idx=self.data.special_tokens.EOS.idx,
+                        smoothing=SmoothingFunction.fuzz_smoothing,
+                    )
+
+                @self.trainer.generator_updater.hook.attach
+                def bleu(batch: int, _, /, calculator=calculator, hook=self.metric_channels[tag]):
+                    if batch % 10 == 0:
+                        ids = self.text_generator.generate_ids(self.args.batch_size)
+                        result = calculator.mean_bleu(ids)
+                        hook(batch, result)
+
+            @self.callback.on_epoch_end.attach
+            def self_bleu(epoch: int, hook=self.metric_channels['samples']):
+                ids = self.text_generator.generate_ids(len(self.data.dataset['train']))
+
+                print("Evaluating generated data SelfBLEU...")
+                print()
+                selfbleu = BLEUCalculator.selfbleu(
+                    ids,
+                    max_gram=ngram,
                     eos_idx=self.data.special_tokens.EOS.idx,
                     smoothing=SmoothingFunction.fuzz_smoothing,
                 )
-            evaluator.on_batch_end.evaluate_ids(
-                calculator.mean_bleu,
-                sample_size=sample_size,
-                channel=register_channel(tag),
-                period=10,
-            )
+                hook(epoch, selfbleu)
 
-        def selfbleu(word_ids) -> t.Callable:
-            print("Evaluating generated data SelfBLEU...")
-            print()
-            return BLEUCalculator.selfbleu(
-                word_ids,
-                max_gram=max_gram,
-                eos_idx=self.data.special_tokens.EOS.idx,
-                smoothing=SmoothingFunction.fuzz_smoothing,
-            )
+        if fed_sample_size := self.args.fed:
+            from core.evaluate import FEDCalculator
 
-        evaluator.on_epoch_end.evaluate_ids(
-            selfbleu,
-            sample_size=min(10000, 2 * len(self.data.dataset['train'])),
-            channel=register_channel('samples'),
+            for tag, dataset in self.data.dataset.items():
+                print(f"Building '{tag}' data FED sentence encoder...")
+                calculator = FEDCalculator(
+                    hub_url="https://tfhub.dev/google/universal-sentence-encoder-large/3",
+                    references=random_sample(dataset.texts, size=fed_sample_size),
+                )
+
+                @self.callback.on_epoch_end.attach
+                def fed(epoch: int, calculator=calculator, hook=self.metric_channels[tag]):
+                    texts = self.generator.generate_texts(fed_sample_size)
+                    d = {'FED': calculator.calculate_fed_score(texts)}
+                    hook(epoch, d)
+
+    def _attach_loggers(self):
+        bar = ProgbarLogger(
+            desc=str(self.tag),
+            total=len(self.data.dataset['train']),
+            module_update_hooks={
+                u.info: u.hook
+                for u in self.trainer.updaters
+            },
+            metric_update_hooks=self.metric_channels,
         )
+        self.callback.on_train_begin.attach(bar.on_train_begin)
+        self.callback.on_epoch_begin.attach(bar.on_epoch_begin)
+        self.callback.on_batch_end.attach(bar.on_batch_end)
+        self.callback.on_epoch_end.attach(bar.on_epoch_end)
+        self.callback.on_train_end.attach(bar.on_train_end)
 
-    def _attach_fed(self, sample_size, evaluator):
-        for tag, dataset in self.data.dataset.items():
-            print(f"Building '{tag}' data FED sentence encoder...")
-            calculator = FEDCalculator(
-                hub_url="https://tfhub.dev/google/universal-sentence-encoder-large/3",
-                references=random_sample(dataset.texts, size=sample_size),
+        if self.args.tensorboard:
+            from tensorboardX import SummaryWriter
+
+            logdir= self.args.tensorboard / self.tag
+            writer = SummaryWriter(logdir=str(logdir))
+
+            @self.callback.on_train_begin.attach
+            def on_train_begin():
+                logdir.mkdir(exist_ok=True)
+                writer.add_text(
+                    'restore_args' if self.checkpoint else 'args',
+                    ' '.join(sys.argv[1:]),
+                    0,
+                )
+
+            for updater in self.trainer.updaters:
+                @updater.hook.attach
+                def update_losses(step: int, losses: t.Mapping):
+                    if step % 10 == 0:
+                        for key, val in losses.items():
+                            writer.add_scalar(
+                                tag=f'losses/{updater.module.scope}/{key}',
+                                scalar_value=val,
+                                global_step=step,  # TODO enerator step?
+                            )
+
+            for name, channel in self.metric_channels.items():
+                @channel.attach
+                def update_metrics(step: int, vals: t.Mapping):
+                    for key, val in vals.items():
+                        writer.add_scalar(
+                            tag=f'{name}/{key}',
+                            scalar_value=val,
+                            global_step=step,  # TODO batch ? epoch?
+                        )
+
+    def _attach_savers(self):
+        if self.args.serving_root:
+            serving_dir = self.args.serving_root / self.tag
+            serving_dir.mkdir(parents=True, exist_ok=True)
+            (serving_dir / 'tokenizer.json').write_text(self.data.tokenizer.model_dump_json())
+
+            @self.callback.on_epoch_end.attach
+            def save_torch(epoch):
+                if epoch % self.args.save_period == 0:
+                    path = serving_dir / f"model_epo{epoch}.pth"
+                    print(f"{epoch} epochs done. Save model to {path}.")
+                    traced = self.text_generator.export_traced()
+                    torch.jit.save(traced, str(path))
+
+        if self.args.checkpoint_root:
+            saver = ModelCheckpointSaver(
+                trainer=self.trainer,
+                directory=self.args.checkpoint_root / self.tag,
             )
 
-            def fed(texts):
-                print("Evaluating FED Score ...")
-                print()
-                return {"FED": calculator.calculate_fed_score(candidates=texts)}
+            @self.callback.on_train_begin.attach
+            def save_args():
+                saver.directory.mkdir(exist_ok=True)
+                if not self.checkpoint:
+                    with open(saver.directory / 'args', 'w') as f:
+                        f.write(self.args.model_dump_json())
 
-            evaluator.on_epoch_end.evaluate_texts(
-                fed,
-                sample_size=sample_size,
-                channel=register_channel(tag),
-            )
+            @self.callback.on_epoch_end.attach
+            def save_model(epoch: int):
+                if epoch % self.args.save_period == 0:
+                    print(f"{epoch} epochs done.")
+                    saver.save(epoch)
+
+        else:
+            warnings.warn("`checkpoint_root` is not given. Training can't be restored!")
 
 
-def print_samples(texts: t.Sequence[str]):
+def _print_samples(texts: t.Sequence[str], /):
     for i, line in enumerate(texts, 1):
-        print(f"{i}.")
-        print(line)
+        print(f"{i}.", line)

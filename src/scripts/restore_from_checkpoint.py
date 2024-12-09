@@ -1,10 +1,9 @@
 import argparse
-import os
 import pathlib
 
 import pydantic
 
-from core.train.callbacks import ModelCheckpoint
+from core.train import ModelCheckpointSaver
 
 from . import train
 from ._configs import GANTrainingConfigs, MLETrainingConfigs
@@ -41,7 +40,7 @@ def main():
     )
     args = parser.parse_args()
 
-    restore_path = args.path
+    restore_path: pathlib.Path = args.path
     main_args_path = restore_path / 'args'
     try:
         with open(main_args_path, 'r') as f_in:
@@ -54,8 +53,8 @@ def main():
     main_args.__dict__.update(args.__dict__)
     train.main(
         main_args,
-        base_tag=os.path.basename(restore_path),
-        checkpoint=ModelCheckpoint.latest_checkpoint(restore_path),
+        base_tag=restore_path.name,
+        checkpoint=ModelCheckpointSaver.latest_checkpoint(restore_path),
     )
 
 

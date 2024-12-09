@@ -1,6 +1,6 @@
-from core.train import DataLoader
-from core.train.callbacks import ModelCheckpoint
-from factories import callback_factory
+import os
+
+from core.train import DataLoader, ModelCheckpointSaver
 from library.utils import logging_indent, parse_args_as
 from scripts.snippets import set_global_random_seed
 
@@ -17,7 +17,11 @@ def MLE_main():
     main(configs)
 
 
-def main(configs: GANTrainingConfigs | MLETrainingConfigs, base_tag=None, checkpoint=None):
+def main(
+    configs: GANTrainingConfigs | MLETrainingConfigs,
+    base_tag: str | None = None,
+    checkpoint: str | os.PathLike[str] | None = None,
+):
     with logging_indent("Set global random seed"):
         set_global_random_seed(configs.random_seed)
 
@@ -33,22 +37,24 @@ def main(configs: GANTrainingConfigs | MLETrainingConfigs, base_tag=None, checkp
         trainer.summary()
 
     with logging_indent("Prepare Callback"):
-        data_loader = DataLoader(
-            preprocessed_result.dataset['train'],
-            batch_size=configs.batch_size,
-            n_epochs=configs.epochs,
-        )
-        data_loader.callback = callback_factory.create(
-            configs,
-            trainer=trainer,
-            generator=generator,
+        callback = configs.get_callback(
             data=preprocessed_result,
+            generator=generator,
+            trainer=trainer,
+            checkpoint=checkpoint,
             base_tag=base_tag,
         )
+        callback.summary()
 
+    data_loader = DataLoader(
+        dataset=preprocessed_result.dataset['train'].ids,
+        batch_size=configs.batch_size,
+        n_epochs=configs.epochs,
+        callback=callback,
+    )
     if checkpoint:
         print(f"Restore from checkpoint: {checkpoint}")
         trainer.load_state(path=checkpoint)
-        data_loader.skip_epochs(ModelCheckpoint.epoch_number(checkpoint))
+        data_loader.skip_epochs(ModelCheckpointSaver.epoch_number(checkpoint))
 
     trainer.fit(data_loader)

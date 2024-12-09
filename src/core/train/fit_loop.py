@@ -1,52 +1,70 @@
-from more_itertools import ilen
+from __future__ import annotations
 
-from core.preprocess import TextDataset
+import typing as t
+
+import more_itertools
+import numpy.typing as npt
+
+from core.train.pubsub import EventHook
 from library.utils import batch_generator, format_highlight
-
-from .callbacks import NullCallback
 
 
 class DataLoader:
 
-    def __init__(self, dataset: TextDataset, batch_size: int, n_epochs: int):
+    def __init__(
+        self,
+        dataset: npt.NDArray,
+        batch_size: int,
+        n_epochs: int,
+        callback: Callback | None = None,
+    ):
         self.dataset = dataset
         self.batch_size = batch_size
         self.n_epochs = n_epochs
+        self.callback = callback or Callback()
 
-        self.callback = NullCallback()
-        self.batch = 0
-        self.epoch = 1
+        self._batch = 0
+        self._epoch = 1
 
-    def skip_epochs(self, epochs):
+    def skip_epochs(self, epochs: int):
         # exhaust batch_generator to make sure random state is same
-        self.batch += sum(ilen(self._get_batch_generator()) for _ in range(epochs))
+        self._batch += sum(more_itertools.ilen(self._get_batch_generator()) for _ in range(epochs))
         print(f"Skip {epochs} epochs. Finish restoring process.")
-        self.epoch += epochs
+        self._epoch += epochs
 
-    def __iter__(self):
-        self.callback.on_train_begin(is_restored=self.epoch > 1)
+    def __iter__(self) -> t.Iterator[npt.NDArray]:
+        self.callback.on_train_begin()
         print(format_highlight("Start Training"))
-        while self.epoch <= self.n_epochs:
-            self.callback.on_epoch_begin(self.epoch)
+        while self._epoch <= self.n_epochs:
+            self.callback.on_epoch_begin(self._epoch)
             for batch_data in self._get_batch_generator():
-                self.callback.on_batch_begin(self.batch)
+                self.callback.on_batch_begin(self._batch)
                 yield batch_data
-                self.batch += 1
-                self.callback.on_batch_end(self.batch, batch_data)
+                self._batch += 1
+                self.callback.on_batch_end(self._batch, batch_data)
 
-            self.callback.on_epoch_end(self.epoch)
-            self.epoch += 1
+            self.callback.on_epoch_end(self._epoch)
+            self._epoch += 1
 
         self.callback.on_train_end()
 
     def _get_batch_generator(self):
         return batch_generator(
-            self.dataset.ids,
+            self.dataset,
             batch_size=self.batch_size,
             shuffle=True,
-            full_batch_only=True,
         )
 
-    @property
-    def total(self):
-        return len(self.dataset)
+
+class Callback:
+    def __init__(self) -> None:
+        self.on_train_begin = EventHook[()]()
+        self.on_epoch_begin = EventHook[int]()
+        self.on_batch_begin = EventHook[int]()
+        self.on_batch_end = EventHook[int, npt.NDArray]()
+        self.on_epoch_end = EventHook[int]()
+        self.on_train_end = EventHook[()]()
+
+    def summary(self):
+        # TODO list all hooks and their period
+        ...
