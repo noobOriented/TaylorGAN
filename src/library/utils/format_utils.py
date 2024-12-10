@@ -7,10 +7,7 @@ import rich.text
 def format_highlight(string: str, level: int = 0):
     if level == 0:
         bolder = "*" + "-" * (len(string) + 2) + "*"
-        return rich.text.Text(
-            f"{bolder}\n| {string.upper()} |\n{bolder}",
-            style='bold yellow',
-        )
+        return rich.text.Text(f"{bolder}\n| {string.upper()} |\n{bolder}", style='bold yellow')
     return rich.text.Text(string, style='green')
 
 

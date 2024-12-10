@@ -7,7 +7,7 @@ import numpy.typing as npt
 import rich.progress
 
 from core.cache import cache_center
-from library.utils import counter_or, get_seqlens, safe_divide, unpad
+from library.utils import counter_or, get_seqlens
 
 
 class BLEUCalculator:
@@ -62,7 +62,7 @@ class BLEUCalculator:
         total_count = seqlens[:, np.newaxis] - np.arange(self.max_gram)
         if self.smoothing:
             clipped_count, total_count = self.smoothing(clipped_count, total_count)
-        return safe_divide(clipped_count, total_count)  # avoid zero division
+        return clipped_count / np.maximum(total_count, 1)  # avoid zero division
 
     def _clipped_count(self, candidate: np.ndarray):
         return [ref_counter.clipped_count(candidate) for ref_counter in self.ref_counters]
@@ -105,11 +105,14 @@ def cum_geomean(arr, axis=-1):
 def get_brevity_penalty_table(ref_lengths, maxlen):
     possible_lengths = np.arange(maxlen + 1)
     closest_lengths = get_closest_values(possible_lengths, target=ref_lengths)
-    brevity_penalty = np.minimum(
-        np.exp(1. - safe_divide(closest_lengths, possible_lengths)),
+    return np.minimum(
+        np.exp(1. - closest_lengths / np.maximum(possible_lengths, 1)),
         1.,
     )
-    return brevity_penalty
+
+
+def unpad(sequences, lengths):
+    return (s[:length] for s, length in zip(sequences, lengths))
 
 
 def get_closest_values(arr: np.ndarray, target: np.ndarray):

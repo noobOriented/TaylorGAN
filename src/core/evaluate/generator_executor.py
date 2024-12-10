@@ -38,11 +38,9 @@ class TextGenerator:
     def perplexity(self, inputs: np.ndarray) -> float:
         total_NLL = total_words = 0.
         with torch.no_grad():
-            for batch_x in map(
-                torch.from_numpy,
-                batch_generator(inputs, self.BATCH_SIZE, full_batch_only=False),
-            ):
-                batch_NLL = self.generator.seq_neg_logprobs(batch_x)
+            for batch_array in batch_generator(inputs, self.BATCH_SIZE):
+                batch_tensor = torch.from_numpy(batch_array)
+                batch_NLL = self.generator.seq_neg_logprobs(batch_tensor)
                 total_NLL += batch_NLL.sum()
                 # TODO seqlen
                 total_words += inputs.shape[0] * inputs.shape[1]

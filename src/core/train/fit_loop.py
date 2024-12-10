@@ -48,11 +48,7 @@ class DataLoader:
         self.callback.on_train_end()
 
     def _get_batch_generator(self):
-        return batch_generator(
-            self.dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-        )
+        return batch_generator(self.dataset, batch_size=self.batch_size, shuffle=True)
 
 
 class Callback:

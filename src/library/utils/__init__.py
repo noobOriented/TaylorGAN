@@ -1,4 +1,4 @@
-from .array_utils import get_seqlens, random_sample, safe_divide, unpad
+from .array_utils import get_seqlens, random_sample
 from .cache_utils import FileCache, NumpyCache, PickleCache, reuse_method_call
 from .collections import ExponentialMovingAverageMeter, _counter_ior, counter_or
 from .format_utils import format_highlight, format_object
