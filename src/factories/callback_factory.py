@@ -215,7 +215,6 @@ class _CallbackCreator:
         self.callback.on_train_begin.attach(bar.on_train_begin)
         self.callback.on_epoch_begin.attach(bar.on_epoch_begin)
         self.callback.on_batch_end.attach(bar.on_batch_end)
-        self.callback.on_epoch_end.attach(bar.on_epoch_end)
         self.callback.on_train_end.attach(bar.on_train_end)
 
         if self.args.tensorboard:

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import typing as t
 
-import tqdm
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn, TimeRemainingColumn
+from rich.table import Table
 
-from library.utils import (
-    SEPARATION_LINE, ExponentialMovingAverageMeter, TqdmRedirector, format_highlight, left_aligned,
-)
+from library.utils import ExponentialMovingAverageMeter
 
 from .pubsub import EventHook
 
@@ -17,90 +18,66 @@ class ProgbarLogger:
         self,
         desc: str,
         total: int,
-        module_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]] | None = None,
-        metric_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]] | None = None,
+        module_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]],
+        metric_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]],
     ):
-        self.desc = format_highlight(desc, 1)
-        self.total = total
-        self._module_hooks = module_update_hooks or {}
-        self._metric_hooks = metric_update_hooks or {}
-        self._bars: list[tqdm.tqdm] = []
+        loss_progress = Progress('[green]{task.description}[/green]', '{task.fields[values]}', expand=True)
+        metric_progress = Progress('[cyan]{task.description}[/cyan]', '{task.fields[values]}', expand=True)
+        self._data_progress = Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
+        )
+        self._databar_task = self._data_progress.add_task('', total=total)
 
-    def on_train_begin(self):
-        TqdmRedirector.enable()
-        self._add_bar(bar_format=SEPARATION_LINE)
-        self._header = self._add_bar(bar_format="{desc}: {elapsed}", desc=self.desc)
-        for name, hook in self._module_hooks.items():
-            pbar = self._add_bar(desc=name)
-            pbar.format_meter = _format_meter_for_losses
+        for name, hook in module_update_hooks.items():
+            task_id = loss_progress.add_task(name, values='')
             ema_meter = ExponentialMovingAverageMeter(decay=0.9)
 
             @hook.attach
-            def update_losses(step, losses, pbar=pbar, ema_meter=ema_meter):
-                if step > pbar.n:
-                    pbar.update(step - pbar.n)
-                pbar.set_postfix(ema_meter.apply(**losses))
+            def update_losses(step, losses, task_id=task_id, ema_meter=ema_meter):
+                losses = ema_meter.apply(**losses)
+                loss_progress.update(task_id, values=_NumericalDict(**losses))
 
-        self._add_bar(bar_format=SEPARATION_LINE)
-
-        for m_aligned, hook in zip(
-            left_aligned(self._metric_hooks.keys()),
-            self._metric_hooks.values(),
-        ):
-            pbar = self._add_bar(desc=m_aligned)
-            pbar.format_meter = _format_meter_for_metrics
+        for name, hook in metric_update_hooks.items():
+            task_id = metric_progress.add_task(name, values='')
             ema_meter = ExponentialMovingAverageMeter(decay=0.)  # to persist logged values
 
             @hook.attach
-            def update_metrics(step, vals, pbar=pbar, ema_meter=ema_meter):
-                pbar.set_postfix(ema_meter.apply(**vals))
+            def update_metrics(step, vals, task_id=task_id, ema_meter=ema_meter):
+                vals = ema_meter.apply(**vals)
+                metric_progress.update(task_id, values=_NumericalDict(**vals))
 
-        self._add_bar(bar_format=SEPARATION_LINE)
-
-    def on_epoch_begin(self, epoch):
-        self._databar = self._add_bar(
-            bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]',
-            desc=f"Epoch {epoch}",
-            total=self.total,
-            unit='sample',
-            unit_scale=True,
-            leave=False,
+        self.table = Table(desc)
+        self.table.add_row(
+            Panel.fit(loss_progress, title='Losses', border_style="green"),
+        )
+        self.table.add_row(
+            Panel(metric_progress, title='Metrics', border_style="cyan"),
+        )
+        self.table.add_row(
+            self._data_progress,
         )
 
-    def on_batch_end(self, batch: int, batch_data):
-        self._header.refresh()
-        self._databar.update(len(batch_data))
-
-    def on_epoch_end(self, epoch):
-        self._bars.pop().close()
+    def on_train_begin(self):
+        self.live = Live(self.table)
+        self.live.start()
 
     def on_train_end(self):
-        for b in self._bars:
-            b.close()
-        TqdmRedirector.disable()
+        self.live.stop()
 
-    def _add_bar(self, **kwargs):
-        bar = tqdm.tqdm(
-            file=TqdmRedirector.STDOUT,  # use original stdout port
-            dynamic_ncols=True,
-            position=-len(self._bars),
-            **kwargs,
-        )
-        self._bars.append(bar)
-        return bar
+    def on_epoch_begin(self, epoch):
+        self._data_progress.update(self._databar_task, description=f'Epoch {epoch}', completed=0)
+
+    def on_batch_end(self, batch: int, batch_data):
+        self._data_progress.update(self._databar_task, advance=len(batch_data))
 
 
-# HACK override: remove the leading `,` of postfix
-# https://github.com/tqdm/tqdm/blob/master/tqdm/_tqdm.py#L255-L457
-def _format_meter_for_metrics(*, prefix='', postfix=None, **kwargs):
-    if prefix:
-        prefix = prefix + ': '
-    if not postfix:
-        postfix = 'nan'
-    return f"{prefix}{postfix}"
+class _NumericalDict(dict[str, float]):
 
-
-def _format_meter_for_losses(*, n, prefix='', postfix=None, **kwargs):
-    if not postfix:
-        return f"{prefix} steps: {n}"
-    return f"{prefix} steps: {n}, losses: [{postfix}]"
+    def __init__(self, **kwargs: float) -> None:
+        super().__init__(kwargs)
+    
+    def __format__(self, __format_spec):
+        return ', '.join(f'{k}={v:.3}' for k, v in self.items())
