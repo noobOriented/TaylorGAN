@@ -6,7 +6,7 @@ import more_itertools
 import numpy.typing as npt
 
 from core.train.pubsub import EventHook
-from library.utils import batch_generator, format_highlight
+from library.utils import batch_generator
 
 
 class DataLoader:
@@ -34,7 +34,6 @@ class DataLoader:
 
     def __iter__(self) -> t.Iterator[npt.NDArray]:
         self.callback.on_train_begin()
-        print(format_highlight("Start Training"))
         while self._epoch <= self.n_epochs:
             self.callback.on_epoch_begin(self._epoch)
             for batch_data in self._get_batch_generator():

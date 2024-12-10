@@ -1,68 +1,59 @@
 import builtins
-import sys
+import contextlib
+import functools
 import warnings
-from contextlib import contextmanager
-from functools import partial
+from unittest.mock import patch
 
-import termcolor
+import rich
+import rich.text
 
 from .format_utils import format_highlight
 
 
-STDOUT, STDERR, PRINT = sys.stdout, sys.stderr, builtins.print  # guaranteed builtins!!
-SEPARATION_LINE = termcolor.colored(' '.join(['-'] * 50), attrs=['dark'])
+PRINT = builtins.print = rich.print  # guaranteed builtins!!
+SEPARATION_LINE = rich.text.Text(' '.join('-' * 50), style='dark')
+BULLETS = ["•", "–", "*", "·"]
+_INDENT_LEVEL = 0
 
 
-@contextmanager
-def logging_indent(header: str = None, bullet: bool = True):
+@contextlib.contextmanager
+def logging_indent(header: str | None = None, bullet: bool = True):
+    global _INDENT_LEVEL
     if header:
-        _IndentPrinter.print_header(header)
-
-    if _IndentPrinter.level == 0:  # need redirect
-        if builtins.print != PRINT:
-            warnings.warn("`logging_indent` should not be used with other redirector!")
-        builtins.print = partial(_IndentPrinter.print_body, bullet=bullet)
-
-    _IndentPrinter.level += 1
-    yield
-    _IndentPrinter.level -= 1
-
-    if _IndentPrinter.level == 0:  # need recover
-        builtins.print = PRINT
-    _IndentPrinter.print_footer()
-
-
-class _IndentPrinter:
-
-    '''DO NOT use it with TqdmRedirector!!!'''
-
-    BULLETS = ["•", "–", "*", "·"]
-    level = 0
-
-    @classmethod
-    def print_header(cls, header):
-        if cls.level == 0:
+        if _INDENT_LEVEL == 0:
             print(format_highlight(header))
-        elif cls.level == 1:
+        elif _INDENT_LEVEL == 1:
             print(format_highlight(header, 1))
         else:
             print(header)
 
-    @classmethod
-    def print_body(cls, *args, bullet: bool = True, **kwargs):
-        assert cls.level > 0
-        if cls.level < 2:
-            PRINT(*args, **kwargs)
-        elif bullet:
-            bullet_symbol = cls.BULLETS[min(cls.level, len(cls.BULLETS)) - 1]
-            PRINT(' ' * (2 * cls.level - 2) + bullet_symbol, *args, **kwargs)
-        else:
-            PRINT(' ' * (2 * cls.level - 3), *args, **kwargs)
+    contexts: list[contextlib.AbstractContextManager] = []
+    if _INDENT_LEVEL == 0:  # need redirect
+        if print != PRINT:
+            warnings.warn("`logging_indent` should not be used with other redirector!")
 
-    @classmethod
-    def print_footer(cls):
-        if cls.level == 0:
-            print(SEPARATION_LINE)
-        elif cls.level == 1:
-            print()
+        contexts += [
+            patch('builtins.print', functools.partial(_print_body, bullet=bullet)),
+            patch('rich.print', functools.partial(_print_body, bullet=bullet)),
+        ]
 
+    contexts.append(patch(f'{__name__}._INDENT_LEVEL', _INDENT_LEVEL + 1))
+    with contextlib.ExitStack() as stack:
+        for ctx in contexts:
+            stack.enter_context(ctx)
+        yield
+
+    if _INDENT_LEVEL == 0:
+        print(SEPARATION_LINE)
+    elif _INDENT_LEVEL == 1:
+        print()
+
+
+def _print_body(*args, bullet: bool = True, **kwargs):
+    if _INDENT_LEVEL < 2:
+        PRINT(*args, **kwargs)
+    elif bullet:
+        bullet_symbol = BULLETS[min(_INDENT_LEVEL, len(BULLETS)) - 1]
+        PRINT(' ' * (2 * _INDENT_LEVEL - 4) + bullet_symbol, *args, **kwargs)
+    else:
+        PRINT(' ' * (2 * _INDENT_LEVEL - 3), *args, **kwargs)

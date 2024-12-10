@@ -13,7 +13,7 @@ import numpy.typing as npt
 import pydantic
 
 from core.cache import cache_center
-from library.utils import format_path, logging_indent
+from library.utils import logging_indent
 
 from ._configs import CorpusConfig, Segmentor, SpecialToken
 
@@ -39,7 +39,7 @@ class PreprocessResult:
 
         @cache_center.to_npz(self.cache_key, 'word_vecs.npz')
         def load_embeddings():
-            print(f"Load pretrained embedding from : {format_path(self.embedding_path)}")
+            print(f"Load pretrained embedding from : {self.embedding_path}")
             with open(self.embedding_path) as f:
                 d = pydantic.TypeAdapter(dict[str, list[float]]).validate_json(f.read())
 

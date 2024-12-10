@@ -11,11 +11,11 @@ import warnings
 
 import numpy as np
 import pydantic
+import rich
 import rich.live
 import rich.panel
 import rich.progress
 import rich.table
-import termcolor
 import torch
 
 from core.evaluate import TextGenerator
@@ -143,10 +143,10 @@ class _CallbackCreator:
                 sentences = self.text_generator.generate_texts(3)
                 print(SEPARATION_LINE)
                 print()
-                print(termcolor.colored("Real Sentences (Random Sampled):", 'blue'))
+                rich.print('[blue]Real Sentences (random sampled):')
                 _print_samples(random_sample(self.data.dataset['train'].texts, len(sentences)))
                 print()
-                print(termcolor.colored("Fake Sentences (Random Sampled):", 'red'))
+                rich.print('[red]Fake Sentences (random sampled):')
                 _print_samples(sentences)
                 print()
 

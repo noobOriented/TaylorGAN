@@ -7,7 +7,6 @@ from functools import lru_cache, wraps
 import numpy as np
 import pydantic
 
-from .format_utils import format_path
 from .func_utils import ObjectWrapper
 
 
@@ -20,14 +19,14 @@ class FileCache:
             def wrapped(*args, **kwargs):
                 path_str = cls._get_path_str(path, *args, **kwargs)
                 if os.path.isfile(path_str):
-                    print(f"Load from {format_path(path_str)}")
+                    print(f"Load from {path_str}")
                     return cls.load_data(path_str)
 
                 output = func(*args, **kwargs)
                 if makedirs:
                     os.makedirs(os.path.dirname(path_str), exist_ok=True)
 
-                print(f"Cache to {format_path(path_str)}")
+                print(f"Cache to {path_str}")
                 cls.save_data(output, path_str)
                 return output
 
