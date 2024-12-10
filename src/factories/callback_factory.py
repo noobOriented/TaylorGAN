@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import collections
+import dataclasses
 import os
 import pathlib
 import sys
@@ -12,13 +13,18 @@ import numpy as np
 import pydantic
 import termcolor
 import torch
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn, TimeRemainingColumn
+from rich.table import Table
 
 from core.evaluate import TextGenerator
 from core.models.generators import Generator
 from core.preprocess import PreprocessResult
 from core.train import Callback, EventHook, ModelCheckpointSaver, Trainer
-from core.train.loggers import ProgbarLogger
-from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
+from library.utils import (
+    SEPARATION_LINE, ExponentialMovingAverageMeter, get_seqlens, logging_indent, random_sample,
+)
 
 
 class CallbackConfigs(pydantic.BaseModel):
@@ -72,26 +78,19 @@ class CallbackConfigs(pydantic.BaseModel):
         return creator.callback
 
 
+@dataclasses.dataclass
 class _CallbackCreator:
-
-    def __init__(
-        self,
-        args: CallbackConfigs,
-        generator: Generator,
-        trainer: Trainer,
-        data: PreprocessResult,
-        checkpoint: str | os.PathLike[str] | None,
-        base_tag: str | None = None,
-    ):
-        self.args = args
-        self.data = data
-        self.generator = generator
-        self.trainer = trainer
-        self.checkpoint = checkpoint
+    args: CallbackConfigs
+    generator: Generator
+    trainer: Trainer
+    data: PreprocessResult
+    checkpoint: str | os.PathLike[str] | None
+    base_tag: str | None = None
+    
+    def __post_init__(self):
         self.callback = Callback()
-
-        base_tag = base_tag or f"{data.cache_key}@{time.strftime('%Y%m%d-%H%M%S')}"
-        self.tag = pathlib.Path(*self.args.tags, base_tag)
+        self.base_tag = self.base_tag or f"{self.data.cache_key}@{time.strftime('%Y%m%d-%H%M%S')}"
+        self.tag = pathlib.Path(*self.args.tags, self.base_tag)
         self.text_generator = TextGenerator(self.generator, tokenizer=self.data.tokenizer)
         self.metric_channels = collections.defaultdict(EventHook[int, t.Mapping[str, float]])
 
@@ -175,9 +174,6 @@ class _CallbackCreator:
             @self.callback.on_epoch_end.attach
             def self_bleu(epoch: int, hook=self.metric_channels['samples']):
                 ids = self.text_generator.generate_ids(len(self.data.dataset['train']))
-
-                print("Evaluating generated data SelfBLEU...")
-                print()
                 selfbleu = BLEUCalculator.selfbleu(
                     ids,
                     max_gram=ngram,
@@ -203,19 +199,35 @@ class _CallbackCreator:
                     hook(epoch, d)
 
     def _attach_loggers(self):
-        bar = ProgbarLogger(
-            desc=str(self.tag),
-            total=len(self.data.dataset['train']),
-            module_update_hooks={
-                u.info: u.hook
-                for u in self.trainer.updaters
-            },
-            metric_update_hooks=self.metric_channels,
+        loss_progress = _create_loss_progress({
+            u.info: u.hook
+            for u in self.trainer.updaters
+        })
+        metric_progress = _create_metric_progress(self.metric_channels)
+        data_progress = Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
         )
-        self.callback.on_train_begin.attach(bar.on_train_begin)
-        self.callback.on_epoch_begin.attach(bar.on_epoch_begin)
-        self.callback.on_batch_end.attach(bar.on_batch_end)
-        self.callback.on_train_end.attach(bar.on_train_end)
+        data_task = data_progress.add_task('', total=len(self.data.dataset['train']))
+
+        table = Table(str(self.tag))
+        table.add_row(Panel.fit(loss_progress, title='Losses', border_style="green"))
+        table.add_row(Panel(metric_progress, title='Metrics', border_style="cyan"))
+        table.add_row(data_progress)
+        live = Live(table, refresh_per_second=10)
+
+        self.callback.on_train_begin.attach(live.start)
+        self.callback.on_train_end.attach(live.stop)
+
+        @self.callback.on_epoch_begin.attach
+        def reset_databar(epoch):
+            data_progress.reset(data_task, description=f'Epoch {epoch}')
+
+        @self.callback.on_batch_end.attach
+        def update_databar(batch: int, batch_data):
+            data_progress.update(data_task, advance=len(batch_data))
 
         if self.args.tensorboard:
             from tensorboardX import SummaryWriter
@@ -288,6 +300,55 @@ class _CallbackCreator:
 
         else:
             warnings.warn("`checkpoint_root` is not given. Training can't be restored!")
+
+
+def _create_loss_progress(
+    module_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]],
+):
+    progress = Progress(
+        '[green]{task.description}[/green]',
+        '{task.completed}',
+        '{task.fields[values]}',
+    )
+    for name, hook in module_update_hooks.items():
+        @hook.attach
+        def update_losses(
+            step, losses,
+            task_id=progress.add_task(name, values=''),
+            ema_meter=ExponentialMovingAverageMeter(decay=0.9),
+        ):
+            losses = ema_meter.apply(**losses)
+            progress.update(task_id, advance=1, values=_NumericalDict(**losses))
+
+    return progress
+
+
+def _create_metric_progress(
+    metric_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]],
+):
+    progress = Progress('[cyan]{task.description}[/cyan]', '{task.fields[values]}', expand=True)
+
+    for name, hook in metric_update_hooks.items():
+        @hook.attach
+        def update_metrics(
+            step, vals,
+            task_id=progress.add_task(name, values=''),
+            ema_meter=ExponentialMovingAverageMeter(decay=0.)  # to persist logged values,
+        ):
+            vals = ema_meter.apply(**vals)
+            progress.update(task_id, values=_NumericalDict(**vals))
+
+    return progress
+
+
+class _NumericalDict(dict[str, float]):
+
+    def __init__(self, **kwargs: float) -> None:
+        super().__init__(kwargs)
+    
+    def __format__(self, __format_spec):
+        return ', '.join(f'{k}={v:.3}' for k, v in self.items())
+
 
 
 def _print_samples(texts: t.Sequence[str], /):
