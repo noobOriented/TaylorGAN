@@ -71,9 +71,9 @@ class BLEUMetrics:
     def calculate(self, tokens, **kwargs):
         metrics: dict[str, float] = {}
         for tag, calc in self.calculators.items():
-            mean_bleu = calc.mean_bleu(tokens)
+            mean_bleu = calc.bleu(tokens).mean(0)
             metrics |= {
-                f'{tag}_BLEU-{i}': v
+                f'{tag}.BLEU-{i}': v
                 for i, v in enumerate(mean_bleu, 1)
             }
 
@@ -82,7 +82,7 @@ class BLEUMetrics:
             max_gram=self.max_gram,
             eos_idx=self.eos_idx,
             smoothing=SmoothingFunction.fuzz_smoothing,
-        )
+        ).mean(0)
         metrics |= {f'SBLEU-{i}': v for i, v in enumerate(selfbleu, 1)}
         return metrics
 

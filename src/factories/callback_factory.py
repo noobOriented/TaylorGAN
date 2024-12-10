@@ -4,7 +4,6 @@ import collections
 import dataclasses
 import os
 import pathlib
-import string
 import sys
 import time
 import typing as t
@@ -12,14 +11,12 @@ import warnings
 
 import numpy as np
 import pydantic
+import rich.live
+import rich.panel
+import rich.progress
+import rich.table
 import termcolor
 import torch
-from rich.live import Live
-from rich.panel import Panel
-from rich.progress import (
-    BarColumn, Progress, TaskID, TaskProgressColumn, TextColumn, TimeRemainingColumn,
-)
-from rich.table import Table
 
 from core.evaluate import TextGenerator
 from core.models.generators import Generator
@@ -95,7 +92,7 @@ class _CallbackCreator:
         self.base_tag = self.base_tag or f"{self.data.cache_key}@{time.strftime('%Y%m%d-%H%M%S')}"
         self.tag = pathlib.Path(*self.args.tags, self.base_tag)
         self.text_generator = TextGenerator(self.generator, tokenizer=self.data.tokenizer)
-        self.metric_channels = collections.defaultdict[str, EventHook[int, float]](EventHook)
+        self.metric_channels = collections.defaultdict[str, EventHook[int, t.Any]](EventHook)
 
     def attach_events(self):
         self._attach_evaluators()
@@ -134,7 +131,7 @@ class _CallbackCreator:
     def _attach_evaluators(self):
 
         @self.trainer.generator_updater.hook.attach
-        def calculate_mean_length(batch: int, _, hook=self.metric_channels['avg-length']):
+        def calculate_mean_length(batch: int, _, hook=self.metric_channels['avg length']):
             if batch % 10 == 0:
                 ids = self.text_generator.generate_ids(10)
                 mean_length = np.mean(get_seqlens(ids, self.data.special_tokens.EOS.idx))
@@ -166,31 +163,24 @@ class _CallbackCreator:
                         eos_idx=self.data.special_tokens.EOS.idx,
                         smoothing=SmoothingFunction.fuzz_smoothing,
                     )
-                    channels = [
-                        self.metric_channels[f'{tag}.BLEU-{i + 1}']
-                        for i in range(ngram)
-                    ]
 
                 @self.trainer.generator_updater.hook.attach
-                def compute_bleu(batch: int, _, c=calculator, channels=channels):
+                def compute_bleu(batch: int, _, c=calculator, hook=self.metric_channels[f'{tag} BLEU 1~{ngram}']):
                     if batch % 10 == 0:
                         ids = self.text_generator.generate_ids(self.args.batch_size)
-                        bleu = c.mean_bleu(ids)
-                        for hook, val in zip(channels, bleu):
-                            hook(batch, val)
+                        mean_bleu = c.bleu(ids).mean(0)
+                        hook(batch, mean_bleu)
 
-            channels = [self.metric_channels[f'SBLEU-{i + 1}'] for i in range(ngram)]
             @self.callback.on_epoch_end.attach
-            def compute_selfbleu(epoch: int, channels=channels):
+            def compute_selfbleu(epoch: int, hook=self.metric_channels[f'self BLEU 1~{ngram}']):
                 ids = self.text_generator.generate_ids(len(self.data.dataset['train']))
-                sbleu = BLEUCalculator.selfbleu(
+                mean_sbleu = BLEUCalculator.selfbleu(
                     ids,
                     max_gram=ngram,
                     eos_idx=self.data.special_tokens.EOS.idx,
                     smoothing=SmoothingFunction.fuzz_smoothing,
-                )
-                for hook, val in zip(channels, sbleu):
-                    hook(epoch, val)
+                ).mean(0)
+                hook(epoch, mean_sbleu)
 
         if fed_sample_size := self.args.fed:
             from core.evaluate import FEDCalculator
@@ -209,25 +199,23 @@ class _CallbackCreator:
                     hook(epoch, score)
 
     def _attach_loggers(self):
-        loss_progress = _create_loss_progress({
-            u.info: u.hook
-            for u in self.trainer.updaters
-        })
-        metric_progress = _create_metric_progress(self.metric_channels)
-        data_progress = Progress(
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            TimeRemainingColumn(),
+        table = rich.table.Table.grid()
+        table.add_row(str(self.tag))
+        table.add_row(
+            _create_modules_panel(self.trainer),
+            _create_metric_panel(self.metric_channels),
+        )
+        data_progress = rich.progress.Progress(
+            '[progress.description]{task.description}',
+            rich.progress.SpinnerColumn(),
+            rich.progress.BarColumn(),
+            rich.progress.MofNCompleteColumn(),
+            rich.progress.TimeRemainingColumn(),
         )
         data_task = data_progress.add_task('', total=len(self.data.dataset['train']))
+        table.add_row(data_progress, end_section=True)
 
-        table = Table(str(self.tag))
-        table.add_row(Panel.fit(loss_progress, title='Losses', border_style="green"))
-        table.add_row(Panel(metric_progress, title='Metrics', border_style="cyan"))
-        table.add_row(data_progress)
-        live = Live(table, refresh_per_second=10)
-
+        live = rich.live.Live(table, refresh_per_second=10)
         self.callback.on_train_begin.attach(live.start)
         self.callback.on_train_end.attach(live.stop)
 
@@ -267,9 +255,9 @@ class _CallbackCreator:
 
             for name, channel in self.metric_channels.items():
                 @channel.attach
-                def update_metrics(step: int, val: float):
+                def update_metrics(step: int, val: float, tag=name.replace('.', '/')):
                     writer.add_scalar(
-                        tag=name.replace('.', '/'),
+                        tag,
                         scalar_value=val,
                         global_step=step,  # TODO batch ? epoch?
                     )
@@ -311,46 +299,53 @@ class _CallbackCreator:
             warnings.warn("`checkpoint_root` is not given. Training can't be restored!")
 
 
-def _create_loss_progress(
-    module_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]],
-):
-    progress = Progress('{task.description}', 'updates={task.completed}', '{task.fields[losses]}',
-        expand=True,
-    )
-    for name, hook in module_update_hooks.items():
-        @hook.attach
-        def _(
-            step, losses,
-            task_id=progress.add_task(name, losses='nan'),
-            ema_meter=ExponentialMovingAverageMeter(decay=0.9),
-        ):
+def _create_modules_panel(trainer: Trainer):
+
+    def _format_losses(losses: t.Mapping[str, float], /):
+        return ' '.join(f'{k}={v:.3}' for k, v in losses.items())
+
+    table = rich.table.Table.grid()
+
+    for updater in trainer.updaters:
+        progress = rich.progress.Progress('{task.completed}', '{task.fields[losses]}')
+        task_id = progress.add_task('', losses='nan')
+        ema = ExponentialMovingAverageMeter(decay=0.9)
+
+        @updater.hook.attach
+        def _(step, losses, progress=progress, task_id=task_id, ema_meter=ema):
             losses = ema_meter.apply(**losses)
-            progress.update(task_id, advance=1, losses=_FloatDictFormatter(losses))
+            progress.update(task_id, advance=1, losses=_LazyFormatter(losses, _format_losses))
 
-    return progress
+        table.add_row(
+            rich.panel.Panel(progress, border_style='blue', title=updater.module.scope, padding=(0, 2)),
+        )
+
+    return table
 
 
-def _create_metric_progress(
-    metric_update_hooks: t.Mapping[str, EventHook[int, float]],
+def _create_metric_panel(
+    metric_update_hooks: t.Mapping[str, EventHook[int, t.Any]],
 ):
-    progress = Progress('{task.description}', '{task.fields[value]:.3}', expand=True)
+    progress = rich.progress.Progress('{task.description}', '{task.fields[value]:.3}')
+
+    def formatter(v, /):
+        return np.array2string(np.asarray(v), precision=3).strip('[]')
 
     for name, hook in metric_update_hooks.items():
-        task_id = progress.add_task(name, value='nan')
         @hook.attach
-        def _(step, val: float, task_id=task_id):
-            progress.update(task_id, value=val)
+        def _(step, val, task_id=progress.add_task(name, value='nan')):
+            progress.update(task_id, value=_LazyFormatter(val, formatter))
 
-    return progress
+    return rich.panel.Panel(progress, title='Metrics', border_style='cyan', padding=(1, 1))
 
 
 @dataclasses.dataclass
-class _FloatDictFormatter:
-    wrapped: dict[str, float]
+class _LazyFormatter[T]:
+    wrapped: T
+    func: t.Callable[[T], str]
 
     def __format__(self, __format_spec):
-        return ', '.join(f'{k}={v:.3}' for k, v in self.wrapped.items())
-
+        return self.func(self.wrapped)
 
 
 def _print_samples(texts: t.Sequence[str], /):

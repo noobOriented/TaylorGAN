@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 import typing as t
 
 
@@ -6,7 +7,7 @@ def safe_divide(a, b):
     return a / np.maximum(b, 1)
 
 
-def get_seqlens(data: np.ndarray, eos_idx):
+def get_seqlens(data: np.ndarray, eos_idx: int) -> npt.NDArray[np.uint]:
     data = np.asarray(data, dtype=np.int64)
     end_mask = np.equal(data, eos_idx)
     return np.where(

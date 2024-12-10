@@ -34,15 +34,12 @@ class BLEUCalculator:
         ]
         self.brevity_penalty = get_brevity_penalty_table(ref_lengths, maxlen=references.shape[1])
 
-    def mean_bleu(self, candidates: npt.NDArray[np.uint]) -> t.Sequence[float]:
-        return self.bleu(candidates).mean(axis=0)  # shape (max_gram)
-
     @classmethod
-    def selfbleu(cls, samples: npt.NDArray, **kwargs) -> t.Sequence[float]:
+    def selfbleu(cls, samples: npt.NDArray[np.uint], **kwargs):
         candidates, references = np.split(samples, 2)
-        return cls(references, **kwargs).mean_bleu(candidates)
+        return cls(references, **kwargs).bleu(candidates)
 
-    def bleu(self, candidates: np.ndarray) -> np.ndarray:
+    def bleu(self, candidates: npt.NDArray[np.uint]) -> npt.NDArray[np.floating]:
         candidates = np.asarray(candidates, dtype=self.INT_DTYPE)
         cand_lens = get_seqlens(candidates, eos_idx=self.eos_idx)
 
