@@ -2,11 +2,12 @@ import functools
 import typing as t
 
 import pydantic
+import rich.progress
 import yaml
 
 from core.cache import cache_center
 from core.preprocess import CorpusConfig, PreprocessResult, TextDataset, Tokenizer
-from library.utils import format_id, format_path, logging_indent, tqdm_open
+from library.utils import format_id, format_path, logging_indent
 
 
 CONFIG_PATH = 'datasets/corpus.yaml'
@@ -53,7 +54,7 @@ class DataConfigs(pydantic.BaseModel):
             @cache_center.to_npz(self._cache_key, f'{key}_data.npz')
             def _process_text_file(filepath):
                 print(f"Load corpus data from {format_path(filepath)}")
-                with tqdm_open(filepath) as f:
+                with rich.progress.open(filepath, 'r') as f:
                     return tokenizer.texts_to_array(f)
 
             with logging_indent(f"{key} data:", bullet=False):

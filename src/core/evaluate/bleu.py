@@ -4,7 +4,7 @@ from collections import Counter, defaultdict
 
 import numpy as np
 import numpy.typing as npt
-from tqdm import tqdm
+import rich.progress
 
 from core.cache import cache_center
 from library.utils import counter_or, get_seqlens, safe_divide, unpad
@@ -92,7 +92,7 @@ class NGramCounter:
             seqs = unpad(references, seqlens)
             if verbose:
                 print(f"Building {n}-gram table...")
-                seqs = tqdm(seqs, total=len(references), unit='sample')
+                seqs = rich.progress.track(seqs, total=len(references))
             return counter_or(Counter(hashable_ngrams(s, n)) for s in seqs)
 
         if cache_dir:

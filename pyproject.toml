@@ -14,10 +14,10 @@ more-itertools = "*"
 tensorboardx = "*"
 tensorflow = "1.13.1"
 tensorflow-hub = "0.7.0"
-tqdm = "^4.40.0"
 pyyaml = "*"
 torch = "^2.0.0"
 pydantic = "^2.10.2"
+rich = "^13.9.4"
 
 [tool.poetry.group.dev.dependencies]
 wemake-python-styleguide = ">=0.17"

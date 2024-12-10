@@ -1,20 +1,7 @@
 import numpy as np
 import pytest
 
-from ..iterator import batch_generator, count_lines, tqdm_open
-
-
-def test_tqdm_open(tmp_path):
-    filepath = tmp_path / 'test_tqdm_open.txt'
-    filepath.write_text('tqdm_open\n' * 100)
-    with tqdm_open(filepath, 'r') as f_in:
-        assert all(line == 'tqdm_open\n' for line in f_in)
-
-
-def test_count_lines(tmp_path):
-    filepath = tmp_path / 'test_count_lines.txt'
-    filepath.write_text('\n' * 100)
-    assert count_lines(filepath) == 100
+from ..iterator import batch_generator
 
 
 class TestBatchGenerator:

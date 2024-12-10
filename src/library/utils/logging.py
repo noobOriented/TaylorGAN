@@ -5,8 +5,6 @@ from contextlib import contextmanager
 from functools import partial
 
 import termcolor
-from tqdm import tqdm
-from tqdm.contrib import DummyTqdmFile
 
 from .format_utils import format_highlight
 
@@ -68,28 +66,3 @@ class _IndentPrinter:
         elif cls.level == 1:
             print()
 
-
-class TqdmRedirector:
-
-    STDOUT, STDERR, PRINT = STDOUT, STDERR, PRINT
-
-    @classmethod
-    def enable(cls):
-        if (sys.stdout, sys.stderr, builtins.print) != (STDOUT, STDERR, PRINT):
-            warnings.warn(f"`{cls.__name__}` should not be used with other redirector!")
-
-        tqdm_out, tqdm_err = DummyTqdmFile(STDOUT), DummyTqdmFile(STDERR)
-        STREAMS_TO_REDIRECT = {None, STDOUT, STDERR, tqdm_out, tqdm_err}
-
-        def new_print(*values, sep=' ', end='\n', file=None, flush=False):
-            if file in STREAMS_TO_REDIRECT:
-                # NOTE tqdm (v4.40.0) can't support end != '\n' and flush
-                tqdm.write(sep.join(map(str, values)), file=STDOUT)
-            else:
-                PRINT(*values, sep=sep, end=end, file=file, flush=flush)
-
-        sys.stdout, sys.stderr, builtins.print = tqdm_out, tqdm_err, new_print
-
-    @classmethod
-    def disable(cls):
-        sys.stdout, sys.stderr, builtins.print = STDOUT, STDERR, PRINT
