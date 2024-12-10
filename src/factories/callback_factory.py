@@ -4,6 +4,7 @@ import collections
 import dataclasses
 import os
 import pathlib
+import string
 import sys
 import time
 import typing as t
@@ -15,7 +16,9 @@ import termcolor
 import torch
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn, TimeRemainingColumn
+from rich.progress import (
+    BarColumn, Progress, TaskID, TaskProgressColumn, TextColumn, TimeRemainingColumn,
+)
 from rich.table import Table
 
 from core.evaluate import TextGenerator
@@ -92,7 +95,7 @@ class _CallbackCreator:
         self.base_tag = self.base_tag or f"{self.data.cache_key}@{time.strftime('%Y%m%d-%H%M%S')}"
         self.tag = pathlib.Path(*self.args.tags, self.base_tag)
         self.text_generator = TextGenerator(self.generator, tokenizer=self.data.tokenizer)
-        self.metric_channels = collections.defaultdict(EventHook[int, t.Mapping[str, float]])
+        self.metric_channels = collections.defaultdict[str, EventHook[int, float]](EventHook)
 
     def attach_events(self):
         self._attach_evaluators()
@@ -131,11 +134,11 @@ class _CallbackCreator:
     def _attach_evaluators(self):
 
         @self.trainer.generator_updater.hook.attach
-        def calculate_mean_length(batch: int, _, hook=self.metric_channels['samples']):
+        def calculate_mean_length(batch: int, _, hook=self.metric_channels['avg-length']):
             if batch % 10 == 0:
                 ids = self.text_generator.generate_ids(10)
                 mean_length = np.mean(get_seqlens(ids, self.data.special_tokens.EOS.idx))
-                hook(batch, {'mean_length': float(mean_length)})
+                hook(batch, float(mean_length))
 
         @self.trainer.generator_updater.hook.attach
         def log_texts(batch: int, _):
@@ -163,24 +166,31 @@ class _CallbackCreator:
                         eos_idx=self.data.special_tokens.EOS.idx,
                         smoothing=SmoothingFunction.fuzz_smoothing,
                     )
+                    channels = [
+                        self.metric_channels[f'{tag}.BLEU-{i + 1}']
+                        for i in range(ngram)
+                    ]
 
                 @self.trainer.generator_updater.hook.attach
-                def bleu(batch: int, _, /, calculator=calculator, hook=self.metric_channels[tag]):
+                def compute_bleu(batch: int, _, c=calculator, channels=channels):
                     if batch % 10 == 0:
                         ids = self.text_generator.generate_ids(self.args.batch_size)
-                        result = calculator.mean_bleu(ids)
-                        hook(batch, result)
+                        bleu = c.mean_bleu(ids)
+                        for hook, val in zip(channels, bleu):
+                            hook(batch, val)
 
+            channels = [self.metric_channels[f'SBLEU-{i + 1}'] for i in range(ngram)]
             @self.callback.on_epoch_end.attach
-            def self_bleu(epoch: int, hook=self.metric_channels['samples']):
+            def compute_selfbleu(epoch: int, channels=channels):
                 ids = self.text_generator.generate_ids(len(self.data.dataset['train']))
-                selfbleu = BLEUCalculator.selfbleu(
+                sbleu = BLEUCalculator.selfbleu(
                     ids,
                     max_gram=ngram,
                     eos_idx=self.data.special_tokens.EOS.idx,
                     smoothing=SmoothingFunction.fuzz_smoothing,
                 )
-                hook(epoch, selfbleu)
+                for hook, val in zip(channels, sbleu):
+                    hook(epoch, val)
 
         if fed_sample_size := self.args.fed:
             from core.evaluate import FEDCalculator
@@ -193,10 +203,10 @@ class _CallbackCreator:
                 )
 
                 @self.callback.on_epoch_end.attach
-                def fed(epoch: int, calculator=calculator, hook=self.metric_channels[tag]):
+                def compute_fed(epoch: int, calculator=calculator, hook=self.metric_channels[f'{tag}.FED']):
                     texts = self.generator.generate_texts(fed_sample_size)
-                    d = {'FED': calculator.calculate_fed_score(texts)}
-                    hook(epoch, d)
+                    score = calculator.calculate_fed_score(texts)
+                    hook(epoch, score)
 
     def _attach_loggers(self):
         loss_progress = _create_loss_progress({
@@ -257,13 +267,12 @@ class _CallbackCreator:
 
             for name, channel in self.metric_channels.items():
                 @channel.attach
-                def update_metrics(step: int, vals: t.Mapping):
-                    for key, val in vals.items():
-                        writer.add_scalar(
-                            tag=f'{name}/{key}',
-                            scalar_value=val,
-                            global_step=step,  # TODO batch ? epoch?
-                        )
+                def update_metrics(step: int, val: float):
+                    writer.add_scalar(
+                        tag=name.replace('.', '/'),
+                        scalar_value=val,
+                        global_step=step,  # TODO batch ? epoch?
+                    )
 
     def _attach_savers(self):
         if self.args.serving_root:
@@ -305,49 +314,42 @@ class _CallbackCreator:
 def _create_loss_progress(
     module_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]],
 ):
-    progress = Progress(
-        '[green]{task.description}[/green]',
-        '{task.completed}',
-        '{task.fields[values]}',
+    progress = Progress('{task.description}', 'updates={task.completed}', '{task.fields[losses]}',
+        expand=True,
     )
     for name, hook in module_update_hooks.items():
         @hook.attach
-        def update_losses(
+        def _(
             step, losses,
-            task_id=progress.add_task(name, values=''),
+            task_id=progress.add_task(name, losses='nan'),
             ema_meter=ExponentialMovingAverageMeter(decay=0.9),
         ):
             losses = ema_meter.apply(**losses)
-            progress.update(task_id, advance=1, values=_NumericalDict(**losses))
+            progress.update(task_id, advance=1, losses=_FloatDictFormatter(losses))
 
     return progress
 
 
 def _create_metric_progress(
-    metric_update_hooks: t.Mapping[str, EventHook[int, t.Mapping]],
+    metric_update_hooks: t.Mapping[str, EventHook[int, float]],
 ):
-    progress = Progress('[cyan]{task.description}[/cyan]', '{task.fields[values]}', expand=True)
+    progress = Progress('{task.description}', '{task.fields[value]:.3}', expand=True)
 
     for name, hook in metric_update_hooks.items():
+        task_id = progress.add_task(name, value='nan')
         @hook.attach
-        def update_metrics(
-            step, vals,
-            task_id=progress.add_task(name, values=''),
-            ema_meter=ExponentialMovingAverageMeter(decay=0.)  # to persist logged values,
-        ):
-            vals = ema_meter.apply(**vals)
-            progress.update(task_id, values=_NumericalDict(**vals))
+        def _(step, val: float, task_id=task_id):
+            progress.update(task_id, value=val)
 
     return progress
 
 
-class _NumericalDict(dict[str, float]):
+@dataclasses.dataclass
+class _FloatDictFormatter:
+    wrapped: dict[str, float]
 
-    def __init__(self, **kwargs: float) -> None:
-        super().__init__(kwargs)
-    
     def __format__(self, __format_spec):
-        return ', '.join(f'{k}={v:.3}' for k, v in self.items())
+        return ', '.join(f'{k}={v:.3}' for k, v in self.wrapped.items())
 
 
 
