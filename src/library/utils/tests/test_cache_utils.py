@@ -3,7 +3,7 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from ..cache_utils import NumpyCache, PickleCache, reuse_method_call
+from ..cache_utils import NumpyCache, PickleCache, cache_method_call
 
 
 @pytest.mark.parametrize(
@@ -66,24 +66,17 @@ def test_cache_callable_path(tmpdir):
     assert create.call_count == 2  # different key, create again
 
 
-def test_reuse_method_call():
-    output = '123'
-    mocker = Mock(return_value=output)
+def test_cache_method_call():
+    obj = Mock(foo=Mock(return_value='123'))
+    wrapped_foo = obj.foo
+    with cache_method_call(obj, 'foo'):
+        assert obj.foo() == '123'
+        assert wrapped_foo.call_count == 1
+        assert obj.foo() == '123'
+        assert wrapped_foo.call_count == 1
 
-    class D:
-
-        def foo(self):
-            return mocker()
-
-    d = D()
-    with reuse_method_call(d, ['foo']) as new_d:
-        assert new_d.foo() == output
-        assert mocker.call_count == 1
-        assert new_d.foo() == output
-        assert mocker.call_count == 1
-
-        assert d.foo() == output
-        assert mocker.call_count == 2  # no cache
+    assert obj.foo() == '123'
+    assert wrapped_foo.call_count == 2  # no cache
 
 
 def equal(x, y):

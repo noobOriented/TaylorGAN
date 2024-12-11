@@ -5,7 +5,7 @@ import torch
 from more_itertools import first
 
 from core.objectives.collections import LossCollection
-from library.utils import logging_indent, reuse_method_call
+from library.utils import logging_indent, cache_method_call
 
 from .optimizer import OptimizerWrapper
 from .pubsub import EventHook
@@ -65,9 +65,9 @@ def _count_numel(params) -> int:
 class GeneratorUpdater(ModuleUpdater):
 
     def update_step(self, real_samples):
-        with reuse_method_call(self.module, ['generate']) as generator:
+        with cache_method_call(self.module, 'generate'):
             loss_collection = sum(
-                loss(generator=generator, real_samples=real_samples)
+                loss(generator=self.module, real_samples=real_samples)
                 for loss in self.losses
             )
 
@@ -85,13 +85,14 @@ class GeneratorUpdater(ModuleUpdater):
 class DiscriminatorUpdater(ModuleUpdater):
 
     def update_step(self, real_samples, fake_samples):
-        with reuse_method_call(
-            self.module,
-            ['score_samples', 'score_word_vector', 'get_embedding'],
-        ) as discriminator:
+        with (
+            cache_method_call(self.module, 'score_samples'),
+            cache_method_call(self.module, 'score_word_vector'),
+            cache_method_call(self.module, 'get_embedding'),
+        ):
             loss_collection = sum(
                 loss(
-                    discriminator=discriminator,
+                    discriminator=self.module,
                     real_samples=real_samples,
                     fake_samples=fake_samples,
                 )

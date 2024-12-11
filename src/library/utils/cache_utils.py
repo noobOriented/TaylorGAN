@@ -1,13 +1,11 @@
-import json
+import contextlib
+import functools
 import os
 import pickle
-from contextlib import contextmanager
-from functools import lru_cache, wraps
+import typing as t
+from unittest.mock import patch
 
 import numpy as np
-import pydantic
-
-from .func_utils import ObjectWrapper
 
 
 class FileCache:
@@ -15,7 +13,7 @@ class FileCache:
     @classmethod
     def tofile(cls, path, makedirs: bool = True):
         def decorator(func):
-            @wraps(func)
+            @functools.wraps(func)
             def wrapped(*args, **kwargs):
                 path_str = cls._get_path_str(path, *args, **kwargs)
                 if os.path.isfile(path_str):
@@ -72,40 +70,7 @@ class NumpyCache(FileCache):
         np.savez_compressed(path, data=data)
 
 
-class JSONSerializableMixin:
-    _subclass_map: dict[str, type] = {}
-
-    @classmethod
-    def __init_subclass__(cls):
-        cls._subclass_map[cls.__name__] = cls
-
-    def serialize(self):
-        return json.dumps(
-            {
-                'class_name': self.__class__.__name__,
-                'config': pydantic.TypeAdapter(self.__class__).dump_python(self, mode='json'),
-            },
-            indent=2,
-        )
-
-    @classmethod
-    def deserialize(cls, data: str):
-        params = json.loads(data)
-        subclass = cls._subclass_map[params['class_name']]
-        if not issubclass(subclass, cls):
-            raise ValueError(f'{cls.__name__}.deserialize on non-subclass {subclass.__name__} is forbidden!')
-        return pydantic.TypeAdapter(subclass).validate_python(params['config'])
-
-
-@contextmanager
-def reuse_method_call(obj, methods: list[str]):
-    wrapped_obj = ObjectWrapper(obj)
-    for method_name in methods:
-        old_method = getattr(obj, method_name)
-        new_method = lru_cache(None)(old_method)
-        setattr(wrapped_obj, method_name, new_method)
-
-    yield wrapped_obj
-
-    for method_name in methods:
-        getattr(wrapped_obj, method_name).cache_clear()
+def cache_method_call(obj, method: str):
+    old_method = getattr(obj, method)
+    new_method = functools.cache(old_method)
+    return patch.object(obj, method, new_method)
