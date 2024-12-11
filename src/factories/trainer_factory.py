@@ -11,10 +11,8 @@ from core.GAN import (
     GradientPenaltyRegularizer, GumbelSoftmaxEstimator, ReinforceEstimator,
     StraightThroughEstimator, TaylorEstimator, WordVectorRegularizer,
 )
-from core.losses import (
-    EmbeddingRegularizer, EntropyRegularizer, Regularizer,
-    SpectralRegularizer, mean_negative_log_likelihood,
-)
+from core.GAN.discriminators import DiscriminatorLoss, EmbeddingRegularizer, SpectralRegularizer
+from core.losses import EntropyRegularizer, GeneratorLoss, mean_negative_log_likelihood
 from core.models import Generator
 from core.preprocess import PreprocessResult
 from core.train import GeneratorUpdater, NonParametrizedTrainer
@@ -32,7 +30,7 @@ class MLEObjectiveConfigs(pydantic.BaseModel):
     g_regularizers: list[str] = []
 
     def get_trainer(self, data: PreprocessResult, generator: Generator):
-        losses: dict[str, tuple[Regularizer, float]] = {'NLL': (mean_negative_log_likelihood, 1)}
+        losses: dict[str, tuple[GeneratorLoss, float]] = {'NLL': (mean_negative_log_likelihood, 1)}
         for s in self.g_regularizers:
             (reg, coeff), info = _G_REGS(s, return_info=True)
             losses[info.func_name] = (reg, coeff)
@@ -65,12 +63,16 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             generator_loss=self._loss_tuple.generator_loss,
             estimator=_ESTIMATORS(self.estimator),
         )
-        g_losses: dict[str, tuple[Regularizer, float]] = {self.loss: (objective, 1)}
+        g_losses: dict[str, tuple[GeneratorLoss, float]] = {
+            self.loss: (objective, 1),
+        }
         for s in self.g_regularizers:
             (reg, coeff), info = _G_REGS(s, return_info=True)
             g_losses[info.func_name] = (reg, coeff)
 
-        d_losses: dict[str, tuple[Regularizer, float]] = {'BCE': (self._loss_tuple.discriminator_loss, 1)}
+        d_losses: dict[str, tuple[DiscriminatorLoss, float]] = {
+            'BCE': (self._loss_tuple.discriminator_loss, 1),
+        }
         for s in self.d_regularizers:
             (reg, coeff), info = _D_REGS(s, return_info=True)
             d_losses[info.func_name] = (reg, coeff)
@@ -157,15 +159,13 @@ def _concat_coeff[**P, T](
 ) -> t.Callable[t.Concatenate[float, P], tuple[T, float]]:
 
     @wraps_with_new_signature(regularizer_cls)
-    def wrapper(coeff: float, *args, **kwargs):
+    def wrapper(coeff: float, *args: P.args, **kwargs: P.kwargs):
         return regularizer_cls(*args, **kwargs), coeff
 
     return wrapper
 
 
 _G_REGS = LookUpCall({
-    'spectral': _concat_coeff(SpectralRegularizer),
-    'embedding': _concat_coeff(EmbeddingRegularizer),
     'entropy': _concat_coeff(EntropyRegularizer),
 })
 _OPTIMIZERS = LookUpCall({

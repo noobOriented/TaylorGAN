@@ -19,19 +19,19 @@ class TextGenerator:
         self.generator = generator
         self._tokenizer = tokenizer
 
-    def generate_texts(self, size: int, temperature: float = 1.) -> list[str]:
+    def generate_texts(self, size: int, *, temperature: float = 1) -> list[str]:
         return [
             self._tokenizer.ids_to_text(ids)
-            for ids in self.generate_ids(size, temperature)
+            for ids in self.generate_ids(size, temperature=temperature)
         ]
 
-    def generate_ids(self, size: int, temperature: float = 1.) -> npt.NDArray[np.uint8]:
+    def generate_ids(self, size: int, *, temperature: float = 1) -> npt.NDArray[np.uint8]:
         return np.concatenate(
             [
                 self.generator.forward(
                     torch.tensor(batch_size),
                     torch.tensor(self._tokenizer.maxlen),
-                    torch.tensor(temperature),
+                    temperature=torch.tensor(temperature),
                 )
                 for batch_size in compute_batch_size(size, self.BATCH_SIZE)
             ],

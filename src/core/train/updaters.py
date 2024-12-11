@@ -6,7 +6,7 @@ import torch
 
 from core.models.generators import Generator
 from core.models.sequence_modeling import TokenSequence
-from library.utils import cache_method_call, logging_indent
+from library.utils import cache_method_call
 
 from .pubsub import EventHook
 
@@ -64,25 +64,12 @@ class ModuleUpdater[T: torch.nn.Module]:
         if op_state := state_dict['optimizer']['state']:
             self.step = more_itertools.first(op_state.values())['step']
 
-    def summary(self):
-        trainable_params = sum(p.numel() for p in self.module.parameters() if p.requires_grad)
-        fixed_params = sum(p.numel() for p in self.module.parameters() if not p.requires_grad)
-        with logging_indent(self.module.scope):
-            with logging_indent("Model"):
-                print(f'Trainable     params: {trainable_params:>12}')
-                print(f'Non-trainable params: {fixed_params:>12,}')
-
-            print(f'Optimizer: {self.optimizer}')
-            with logging_indent("Objective:"):
-                for loss in self.losses:
-                    print(loss)
-
 
 class GeneratorUpdater(ModuleUpdater[Generator]):
 
     def compute_loss(self, real_samples: TokenSequence):
         with cache_method_call(self.module, 'generate'):
             return {
-                name: loss(generator=self.module, real_samples=real_samples)
+                name: loss(self.module, real_samples)
                 for name, (loss, _) in self.losses.items()
             }

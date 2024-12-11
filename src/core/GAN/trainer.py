@@ -29,12 +29,11 @@ class GANTrainer(Trainer):
         for batch_data in data_loader:
             real_samples = TokenSequence(
                 torch.from_numpy(batch_data).type(torch.long),
-                eos_idx=1,
+                eos_idx=self.generator_updater.module.special_tokens.EOS.idx,
             )
-            self.discriminator_updater.update_step(
-                real_samples=real_samples,
-                fake_samples=self.generator_updater.module.generate(*batch_data.shape),
-            )
+            batch_size, maxlen = batch_data.shape
+            fake_samples = self.generator_updater.module.generate(batch_size, maxlen)
+            self.discriminator_updater.update_step(real_samples, fake_samples)
             if self.discriminator_updater.step % self.d_steps == 0:
                 self.generator_updater.update_step(real_samples)
 
@@ -52,6 +51,6 @@ class DiscriminatorUpdater(ModuleUpdater[Discriminator]):
             cache_method_call(self.module, 'get_embedding'),
         ):
             return {
-                name: loss(discriminator=self.module, real_samples=real_samples, fake_samples=fake_samples)
+                name: loss(self.module, real_samples=real_samples, fake_samples=fake_samples)
                 for name, (loss, _) in self.losses.items()
             }

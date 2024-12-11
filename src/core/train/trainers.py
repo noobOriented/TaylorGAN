@@ -7,8 +7,9 @@ import numpy as np
 import torch
 
 from core.models.sequence_modeling import TokenSequence
+from library.utils import logging_indent
 
-from .updaters import GeneratorUpdater
+from .updaters import GeneratorUpdater, ModuleUpdater
 
 
 class Trainer(abc.ABC):
@@ -18,7 +19,7 @@ class Trainer(abc.ABC):
 
     @abc.abstractmethod
     def fit(self, data_loader: t.Iterable[np.ndarray], /):
-        pass
+        ...
 
     def save_state(self, path: str | os.PathLike[str]):
         state_dict = [updater.state_dict() for updater in self.updaters]
@@ -30,12 +31,22 @@ class Trainer(abc.ABC):
             updater.load_state_dict(state_dict)
 
     @property
-    def updaters(self):
+    def updaters(self) -> list[ModuleUpdater]:
         return [self.generator_updater]
 
     def summary(self):
         for updater in self.updaters:
-            updater.summary()
+            trainable_params = sum(p.numel() for p in updater.module.parameters() if p.requires_grad)
+            fixed_params = sum(p.numel() for p in updater.module.parameters() if not p.requires_grad)
+            with logging_indent(updater.module.scope):
+                with logging_indent("Model"):
+                    print(f'Trainable     params: {trainable_params:>12}')
+                    print(f'Non-trainable params: {fixed_params:>12,}')
+
+                print(f'Optimizer: {updater.optimizer}')
+                with logging_indent("Objective:"):
+                    for loss in updater.losses:
+                        print(loss)
 
 
 class NonParametrizedTrainer(Trainer):
@@ -44,7 +55,7 @@ class NonParametrizedTrainer(Trainer):
         for batch_data in data_loader:
             real_samples = TokenSequence(
                 torch.from_numpy(batch_data).type(torch.long),
-                eos_idx=1,
+                eos_idx=self.generator_updater.module.special_tokens.EOS.idx,
             )
             self.generator_updater.update_step(real_samples)
 

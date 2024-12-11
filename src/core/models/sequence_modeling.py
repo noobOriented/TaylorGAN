@@ -8,6 +8,7 @@ from library.torch_zoo.functions import random_choice_by_logits, takewhile_mask
 class TokenSequence:
 
     def __init__(self, ids: torch.Tensor, eos_idx: int | None = None, pad_idx: int | None = None):
+        self.ids = ids
         if eos_idx is not None:
             self.mask = takewhile_mask(torch.not_equal(ids, eos_idx))
             if pad_idx is not None:
@@ -16,8 +17,6 @@ class TokenSequence:
         else:
             self.mask = None
 
-        self.ids = ids
-
     @property
     def batch_size(self) -> int:
         return self.ids.shape[0]
@@ -25,12 +24,6 @@ class TokenSequence:
     @property
     def maxlen(self) -> int:
         return self.ids.shape[1]
-
-    @functools.cached_property
-    def length(self) -> torch.Tensor:
-        if self.mask is None:
-            return self.maxlen
-        return self.mask.type_as(torch.int32).sum(dim=1)
 
 
 class SampledTokenSequence(TokenSequence):

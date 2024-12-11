@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import abc
+import dataclasses
 import typing as t
 
 import torch
-import dataclasses
 
 from core.models.generators import Generator
 from core.models.sequence_modeling import TokenSequence
@@ -52,7 +52,7 @@ class GANLossTuple:
     def __init__(self, generator_loss: t.Callable[[torch.Tensor], torch.Tensor]):
         self.generator_loss = generator_loss
 
-    def discriminator_loss(self, discriminator, real_samples, fake_samples):
+    def discriminator_loss(self, discriminator: Discriminator, real_samples: TokenSequence, fake_samples: TokenSequence):
         real_score = discriminator.score_samples(real_samples)
         fake_score = discriminator.score_samples(fake_samples)
         loss_real = BCE(real_score, labels=1.)
@@ -179,8 +179,8 @@ class StraightThroughEstimator(GANEstimator):
         # NOTE, can be derived by chain-rule
         d_onehot = torch.tensordot(d_word_vecs, discriminator.embedding_weight, dims=[[-1], [-1]])
         full_loss = d_onehot.detach() * fake_samples.probs  # (N, T, V)
-        return masked_reduce(full_loss, mask=fake_samples.mask)
         # TODO observable adv=adv_loss.mean()
+        return masked_reduce(full_loss, mask=fake_samples.mask)
 
 
 def _compute_loss_of_probability(

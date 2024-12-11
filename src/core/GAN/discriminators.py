@@ -1,3 +1,4 @@
+import functools
 import typing as t
 
 import torch
@@ -24,7 +25,7 @@ class Discriminator(torch.nn.Module):
         word_vecs = self.get_embedding(samples.ids)
         return self.score_word_vector(word_vecs, samples.mask)
 
-    def get_embedding(self, word_ids) -> torch.Tensor:
+    def get_embedding(self, word_ids: torch.Tensor) -> torch.Tensor:
         return self.embedder(word_ids)
 
     def score_word_vector(self, word_vecs, mask=None) -> torch.Tensor:
@@ -38,8 +39,57 @@ class Discriminator(torch.nn.Module):
 
 class DiscriminatorLoss(t.Protocol):
 
-    def __call__(self, discriminator: Discriminator, real_samples, fake_samples) -> torch.Tensor:
+    def __call__(
+        self,
+        discriminator: Discriminator,
+        real_samples: TokenSequence,
+        fake_samples: TokenSequence,
+    ) -> torch.Tensor:
         ...
+
+
+class EmbeddingRegularizer(DiscriminatorLoss):
+
+    def __init__(self, max_norm: float = 0.):
+        self.max_norm = max_norm
+
+    def __call__(self, discriminator, *args, **kwargs):
+        weight: torch.nn.Parameter = discriminator.embedding_weight
+        if not weight.requires_grad:
+            raise RuntimeError
+
+        embedding_L2_loss = torch.square(weight).sum(dim=1)  # shape (V, )
+        if self.max_norm:
+            embedding_L2_loss = (embedding_L2_loss - self.max_norm ** 2).clamp(min=0.)
+        return embedding_L2_loss.mean() / 2  # shape ()
+
+
+class SpectralRegularizer(DiscriminatorLoss):
+
+    def __call__(self, discriminator, *args, **kwargs):
+        loss = 0
+        for module in discriminator.modules():
+            weight = getattr(module, 'weight', None)
+            if weight is None:
+                continue
+            sn, u, new_u = self._get_spectral_norm(weight)
+            loss += (sn ** 2) / 2
+            u.copy_(new_u)
+
+        return loss
+
+    def _get_spectral_norm(self, weight: torch.nn.Parameter):
+        u = _get_u(weight)  # shape (U)
+        if weight.ndim > 2:
+            weight_matrix = weight.view(weight.shape[0], -1)
+        else:
+            weight_matrix = weight  # shape (U, V)
+
+        v = torch.nn.functional.normalize(torch.mv(weight_matrix.t(), u), dim=0).detach()
+        Wv = torch.mv(weight_matrix, v)  # shape (U)
+        new_u = torch.nn.functional.normalize(Wv, dim=0).detach()  # shape (U)
+        spectral_norm = torch.tensordot(new_u, Wv, dims=1)
+        return spectral_norm, u, new_u
 
 
 class WordVectorRegularizer(DiscriminatorLoss):
@@ -55,7 +105,7 @@ class WordVectorRegularizer(DiscriminatorLoss):
         if self.max_norm:
             real_L2_loss = torch.maximum(real_L2_loss - self.max_norm ** 2, 0.)
             fake_L2_loss = torch.maximum(fake_L2_loss - self.max_norm ** 2, 0.)
-        
+
         return (real_L2_loss + fake_L2_loss).mean() / 2
 
 
@@ -78,3 +128,8 @@ class GradientPenaltyRegularizer(DiscriminatorLoss):
         )  # (N, T, E)
         grad_norm = torch.linalg.norm(d_word_vecs, dim=[1, 2])  # (N, )
         return torch.square(grad_norm - self.center).mean()
+
+
+@functools.cache
+def _get_u(kernel):
+    return kernel.new_empty(kernel.shape[0]).normal_().detach()

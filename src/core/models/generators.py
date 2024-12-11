@@ -1,6 +1,5 @@
 import abc
-from itertools import chain
-
+import itertools
 import torch
 
 from core.preprocess import SpecialToken
@@ -19,7 +18,7 @@ class Generator(torch.nn.Module):
         self.special_tokens = special_tokens
 
     @abc.abstractmethod
-    def generate(self, batch_size: int, maxlen: int, temperature: float | None = None) -> TokenSequence:
+    def generate(self, batch_size: int, maxlen: int, *, temperature: float | None = None) -> TokenSequence:
         ...
 
     @property
@@ -32,7 +31,7 @@ class AutoRegressiveGenerator(Generator):
     def __init__(
         self,
         cell: torch.nn.Module,
-        embedder: torch.nn.Module,
+        embedder: torch.nn.Embedding,
         output_layer: torch.nn.Module,
         special_tokens: type[SpecialToken],
     ):
@@ -44,6 +43,7 @@ class AutoRegressiveGenerator(Generator):
         self,
         batch_size: int,
         maxlen: int,
+        *,
         temperature: float | None = None,
     ) -> SampledTokenSequence:
         word_idx, state = self._get_start_token_and_state(batch_size)
@@ -68,13 +68,13 @@ class AutoRegressiveGenerator(Generator):
         )
 
     def forward(self, batch_size, maxlen, temperature=None):
-        return self.generate(batch_size, maxlen, temperature).ids
+        return self.generate(batch_size, maxlen, temperature=temperature).ids
 
     def seq_neg_logprobs(self, word_ids: torch.Tensor) -> torch.Tensor:
         word_ids = word_ids.type(torch.int64)
         sos_idx, state = self._get_start_token_and_state(batch_size=word_ids.shape[0])
         logits_list = []
-        for word_idx in chain([sos_idx], torch.unbind(word_ids, dim=1)[:-1]):
+        for word_idx in itertools.chain([sos_idx], torch.unbind(word_ids, dim=1)[:-1]):
             word_logits, state = self._step_func(word_idx, state)
             logits_list.append(word_logits)
 
@@ -92,11 +92,6 @@ class AutoRegressiveGenerator(Generator):
 
     def _step_func(self, word_idx, state):
         word_vec = self.embedder(word_idx)
-        # TODO LSTM
         output = state = self.cell(word_vec, state)  # output shape (N, C)
         word_logits = self.output_layer(output)
         return word_logits, state
-
-    @property
-    def networks(self):
-        return [self.cell, self.embedder, self.output_layer]
