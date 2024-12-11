@@ -4,17 +4,16 @@ import torch
 
 from core.models import ModuleInterface
 
-from .base import LossCollection, Regularizer
+from .base import Regularizer
 
 
 class VariableRegularizer(Regularizer):
     loss_name: str
 
-    def __call__(self, generator=None, discriminator=None, **kwargs) -> LossCollection:
+    def __call__(self, generator=None, discriminator=None, **kwargs):
         if generator and discriminator:
             raise TypeError
-        loss = self.compute_loss_of_module(module=generator or discriminator)
-        return LossCollection(loss, **{self.loss_name: loss})
+        return self.compute_loss_of_module(module=generator or discriminator)
 
     def compute_loss_of_module(self, module: ModuleInterface) -> torch.Tensor:
         ...

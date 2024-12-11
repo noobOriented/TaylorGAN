@@ -1,15 +1,15 @@
 import abc
 import typing as t
 
-from library.utils import format_object, wraps_with_new_signature
+import torch
 
-from ..collections import LossCollection
+from library.utils import format_object, wraps_with_new_signature
 
 
 class Regularizer(t.Protocol):
 
     @abc.abstractmethod
-    def __call__(self, **kwargs) -> LossCollection:
+    def __call__(self, **kwargs) -> torch.Tensor:
         ...
 
 
@@ -19,9 +19,8 @@ class LossScaler(Regularizer):
         self.regularizer = regularizer
         self.coeff = coeff
 
-    def __call__(self, *args, **kwargs) -> LossCollection:
-        loss = self.regularizer(*args, **kwargs)
-        return LossCollection(self.coeff * loss.total, **loss.observables)
+    def __call__(self, *args, **kwargs):
+        return self.coeff * self.regularizer(*args, **kwargs)
 
     @classmethod
     def as_constructor(cls, regularizer_cls: t.Callable[..., Regularizer]) -> t.Callable[..., Regularizer]:

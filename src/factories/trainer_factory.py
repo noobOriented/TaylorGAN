@@ -15,7 +15,7 @@ from core.GAN import (
 from core.models import Generator
 from core.objectives import MLEObjective
 from core.objectives.regularizers import (
-    EmbeddingRegularizer, EntropyRegularizer, LossScaler, SpectralRegularizer,
+    EmbeddingRegularizer, EntropyRegularizer, LossScaler, Regularizer, SpectralRegularizer,
 )
 from core.preprocess import PreprocessResult
 from core.train import GeneratorUpdater, NonParametrizedTrainer
@@ -33,10 +33,15 @@ class MLEObjectiveConfigs(pydantic.BaseModel):
     g_regularizers: list[str] = []
 
     def get_trainer(self, data: PreprocessResult, generator: Generator):
+        losses: dict[str, Regularizer] = {'NLL': MLEObjective()}
+        for s in self.g_regularizers:
+            reg, info = _G_REGS(s, return_info=True)
+            losses[info.func_name] = reg
+
         generator_updater = GeneratorUpdater(
             generator,
             optimizer=_OPTIMIZERS(self.g_optimizer)(generator.trainable_variables),
-            losses=[MLEObjective()] + [_G_REGS(s) for s in self.g_regularizers],
+            losses=losses,
         )
         return NonParametrizedTrainer(generator_updater)
 
@@ -61,17 +66,27 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             generator_loss=self._loss_tuple.generator_loss,
             estimator=_ESTIMATORS(self.estimator),
         )
+        g_losses: dict[str, Regularizer] = {'adv': objective}
+        for s in self.g_regularizers:
+            reg, info = _G_REGS(s, return_info=True)
+            g_losses[info.func_name] = reg
+
+        d_losses: dict[str, Regularizer] = {'BCE': self._loss_tuple.discriminator_loss}
+        for s in self.d_regularizers:
+            reg, info = _D_REGS(s, return_info=True)
+            d_losses[info.func_name] = reg
+
         generator_updater = GeneratorUpdater(
             generator,
             optimizer=_OPTIMIZERS(self.g_optimizer)(generator.trainable_variables),
-            losses=[objective] + [_G_REGS(s) for s in self.g_regularizers],
+            losses=g_losses,
         )
         return GANTrainer(
             generator_updater=generator_updater,
             discriminator_updater=DiscriminatorUpdater(
                 discriminator,
                 optimizer=_OPTIMIZERS(self.d_optimizer)(discriminator.trainable_variables),
-                losses=[self._loss_tuple.discriminator_loss] + [_D_REGS(s) for s in self.d_regularizers],
+                losses=d_losses,
             ),
             d_steps=self.d_steps,
         )

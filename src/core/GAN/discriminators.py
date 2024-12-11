@@ -4,7 +4,6 @@ import torch
 
 from core.models.interfaces import ModuleInterface
 from core.models.sequence_modeling import TokenSequence
-from core.objectives.collections import LossCollection
 
 
 class Discriminator(torch.nn.Module, ModuleInterface):
@@ -44,7 +43,7 @@ class Discriminator(torch.nn.Module, ModuleInterface):
 
 class DiscriminatorLoss(t.Protocol):
 
-    def __call__(self, discriminator: Discriminator, real_samples, fake_samples) -> LossCollection:
+    def __call__(self, discriminator: Discriminator, real_samples, fake_samples) -> torch.Tensor:
         ...
 
 
@@ -62,8 +61,7 @@ class WordVectorRegularizer(DiscriminatorLoss):
             real_L2_loss = torch.maximum(real_L2_loss - self.max_norm ** 2, 0.)
             fake_L2_loss = torch.maximum(fake_L2_loss - self.max_norm ** 2, 0.)
         
-        loss = (real_L2_loss + fake_L2_loss).mean() / 2
-        return LossCollection(loss, word_vec=loss)
+        return (real_L2_loss + fake_L2_loss).mean() / 2
 
 
 class GradientPenaltyRegularizer(DiscriminatorLoss):
@@ -84,5 +82,4 @@ class GradientPenaltyRegularizer(DiscriminatorLoss):
             grad_outputs=torch.ones_like(score),
         )  # (N, T, E)
         grad_norm = torch.linalg.norm(d_word_vecs, dim=[1, 2])  # (N, )
-        loss = torch.square(grad_norm - self.center).mean()
-        return LossCollection(loss, grad_penalty=loss)
+        return torch.square(grad_norm - self.center).mean()

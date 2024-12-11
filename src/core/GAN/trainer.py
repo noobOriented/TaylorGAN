@@ -44,7 +44,7 @@ class GANTrainer(Trainer):
 
 
 class DiscriminatorUpdater(ModuleUpdater[Discriminator]):
-    losses: t.Sequence[DiscriminatorLoss]
+    losses: dict[str, DiscriminatorLoss]
 
     def compute_loss(self, real_samples, fake_samples):
         with (
@@ -52,7 +52,7 @@ class DiscriminatorUpdater(ModuleUpdater[Discriminator]):
             cache_method_call(self.module, 'score_word_vector'),
             cache_method_call(self.module, 'get_embedding'),
         ):
-            return sum(
-                loss(discriminator=self.module, real_samples=real_samples, fake_samples=fake_samples)
-                for loss in self.losses
-            )
+            return {
+                name: loss(discriminator=self.module, real_samples=real_samples, fake_samples=fake_samples)
+                for name, loss in self.losses.items()
+            }

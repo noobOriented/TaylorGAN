@@ -7,11 +7,10 @@ import torch
 
 from core.models.generators import Generator
 from core.models.sequence_modeling import SampledTokenSequence, TokenSequence
-from core.objectives.collections import LossCollection
 from library.torch_zoo.functions import gaussian, masked_reduce, pairwise_euclidean
 from library.utils import format_object
 
-from .discriminators import Discriminator, DiscriminatorLoss
+from .discriminators import Discriminator
 
 
 class GANObjective:
@@ -41,7 +40,7 @@ class GANEstimator(abc.ABC):
         fake_samples: TokenSequence,
         discriminator: Discriminator,
         generator_loss: t.Callable,
-    ) -> LossCollection:
+    ) -> torch.Tensor:
         ...
 
     def __str__(self):
@@ -53,13 +52,12 @@ class GANLossTuple:
     def __init__(self, generator_loss: t.Callable[[torch.Tensor], torch.Tensor]):
         self.generator_loss = generator_loss
 
-    def discriminator_loss(self, discriminator, real_samples, fake_samples) -> LossCollection:
+    def discriminator_loss(self, discriminator, real_samples, fake_samples):
         real_score = discriminator.score_samples(real_samples)
         fake_score = discriminator.score_samples(fake_samples)
         loss_real = BCE(real_score, labels=1.)
         loss_fake = BCE(fake_score, labels=0.)
-        loss = (loss_real + loss_fake).mean()
-        return LossCollection(loss, BCE=loss)
+        return (loss_real + loss_fake).mean()
 
 
 class SoftmaxEstimator(GANEstimator):
@@ -100,8 +98,8 @@ class ReinforceEstimator(GANEstimator):
         reward = adv_loss.squeeze(axis=1)  # shape (N, )
 
         advantage = self.compute_advantage(reward)  # shape (N, )
-        policy_loss = (advantage.detach() * fake_samples.seq_neg_logprobs).mean()
-        return LossCollection(policy_loss, adv=adv_loss.mean())
+        # TODO observable adv=adv_loss.mean()
+        return (advantage.detach() * fake_samples.seq_neg_logprobs).mean()
 
     def compute_advantage(self, reward):
         if self.baseline is None:
@@ -147,8 +145,8 @@ class TaylorEstimator(GANEstimator):
 
         normalized_advantage = batch_kernel * advantage / (likelihood + 1e-8)
         full_loss = -normalized_advantage.detach() * fake_samples.probs
-        policy_loss = masked_reduce(full_loss, mask=fake_samples.mask)
-        return LossCollection(policy_loss, adv=adv_loss.mean())
+        # TODO observable adv=adv_loss.mean()
+        return masked_reduce(full_loss, mask=fake_samples.mask)
 
     @staticmethod
     def taylor_first_order(y, x0, xs):
@@ -195,15 +193,14 @@ class StraightThroughEstimator(GANEstimator):
         # NOTE, can be derived by chain-rule
         d_onehot = torch.tensordot(d_word_vecs, discriminator.embedding_matrix, dims=[[-1], [-1]])
         full_loss = d_onehot.detach() * fake_samples.probs  # (N, T, V)
-        policy_loss = masked_reduce(full_loss, mask=fake_samples.mask)
-        return LossCollection(policy_loss, adv=adv_loss.mean())
+        return masked_reduce(full_loss, mask=fake_samples.mask)
+        # TODO observable adv=adv_loss.mean()
 
 
 def _compute_loss_of_probability(discriminator, generator_loss, probs, mask):
     word_vecs = torch.tensordot(probs, discriminator.embedding_matrix, dims=1)  # (N, T, E)
     score = discriminator.score_word_vector(word_vecs, mask)
-    adv_loss = generator_loss(score).mean()
-    return LossCollection(adv_loss, adv=adv_loss)
+    return generator_loss(score).mean()
 
 
 
