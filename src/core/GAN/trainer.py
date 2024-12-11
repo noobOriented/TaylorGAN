@@ -43,8 +43,7 @@ class GANTrainer(Trainer):
         return super().updaters + [self.discriminator_updater]
 
 
-class DiscriminatorUpdater(ModuleUpdater):
-    module: Discriminator
+class DiscriminatorUpdater(ModuleUpdater[Discriminator]):
     losses: t.Sequence[DiscriminatorLoss]
 
     def compute_loss(self, real_samples, fake_samples):

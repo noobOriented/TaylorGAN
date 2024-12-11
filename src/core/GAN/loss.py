@@ -50,22 +50,16 @@ class GANEstimator(abc.ABC):
 
 class GANLossTuple:
 
-    def __init__(
-        self,
-        generator_loss: t.Callable[[torch.Tensor], torch.Tensor],
-        discriminator_loss: t.Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None = None,
-    ):
+    def __init__(self, generator_loss: t.Callable[[torch.Tensor], torch.Tensor]):
         self.generator_loss = generator_loss
-        discriminator_loss = discriminator_loss or D_BCE
 
-        def foo(discriminator, real_samples, fake_samples) -> LossCollection:
-            loss = discriminator_loss(
-                discriminator.score_samples(real_samples),
-                discriminator.score_samples(fake_samples),
-            )
-            return LossCollection(loss, adv=loss)
-
-        self.discriminator_loss: DiscriminatorLoss = foo
+    def discriminator_loss(self, discriminator, real_samples, fake_samples) -> LossCollection:
+        real_score = discriminator.score_samples(real_samples)
+        fake_score = discriminator.score_samples(fake_samples)
+        loss_real = BCE(real_score, labels=1.)
+        loss_fake = BCE(fake_score, labels=0.)
+        loss = (loss_real + loss_fake).mean()
+        return LossCollection(loss, BCE=loss)
 
 
 class SoftmaxEstimator(GANEstimator):

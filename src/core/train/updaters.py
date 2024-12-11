@@ -4,6 +4,7 @@ import typing as t
 import torch
 from more_itertools import first
 
+from core.models.generators import Generator
 from core.models.sequence_modeling import TokenSequence
 from core.objectives.collections import LossCollection
 from library.utils import cache_method_call, logging_indent
@@ -11,11 +12,11 @@ from library.utils import cache_method_call, logging_indent
 from .pubsub import EventHook
 
 
-class ModuleUpdater:
+class ModuleUpdater[T: torch.nn.Module]:
 
     def __init__(
         self,
-        module: torch.nn.Module,
+        module: T,
         optimizer: torch.optim.Optimizer,
         losses: t.Sequence[t.Callable[..., LossCollection]],
     ):
@@ -74,7 +75,7 @@ def _count_numel(params) -> int:
     return sum(p.numel() for p in params)
 
 
-class GeneratorUpdater(ModuleUpdater):
+class GeneratorUpdater(ModuleUpdater[Generator]):
 
     def compute_loss(self, real_samples: TokenSequence):
         with cache_method_call(self.module, 'generate'):
