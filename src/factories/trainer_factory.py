@@ -66,7 +66,7 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             generator_loss=self._loss_tuple.generator_loss,
             estimator=_ESTIMATORS(self.estimator),
         )
-        g_losses: dict[str, tuple[Regularizer, float]] = {'adv': (objective, 1)}
+        g_losses: dict[str, tuple[Regularizer, float]] = {self.loss: (objective, 1)}
         for s in self.g_regularizers:
             (reg, coeff), info = _G_REGS(s, return_info=True)
             g_losses[info.func_name] = (reg, coeff)

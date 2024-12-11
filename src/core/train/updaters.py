@@ -27,7 +27,11 @@ class ModuleUpdater[T: torch.nn.Module]:
         self.losses = losses
 
         self.step = 0
-        self.hook = EventHook[int, t.Mapping[str, float]]()
+        self.step_hook = EventHook[int]()
+        self.loss_hooks = {
+            k: EventHook[int, float]()
+            for k in losses.keys()
+        }
 
     @abc.abstractmethod
     def compute_loss(self, *args, **kwargs) -> dict[str, torch.Tensor]:
@@ -35,10 +39,12 @@ class ModuleUpdater[T: torch.nn.Module]:
 
     def update_step(self, *args, **kwargs):
         losses = self.compute_loss(*args, **kwargs)
-        sum_loss: torch.Tensor = sum(self.losses[k][1] * v for k, v in losses.items())
-        loss_vals = {k: v.detach().numpy() for k, v in losses.items()}
-        self.hook(self.step, loss_vals)
+        for k, v in losses.items():
+            self.loss_hooks[k](self.step, v.detach().numpy())
+
+        self.step_hook(self.step)
         self.optimizer.zero_grad()
+        sum_loss: torch.Tensor = sum(self.losses[k][1] * v for k, v in losses.items())
         sum_loss.backward()
         self.optimizer.step()
         self.step += 1

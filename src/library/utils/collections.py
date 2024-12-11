@@ -17,11 +17,12 @@ class ExponentialMovingAverageMeter:
 
     def __init__(self, decay: float = 0.9):
         self.decay = decay
-        self.prev_vals: dict[str, float] = {}
+        self.prev_val: float | None = None
 
-    def apply(self, **kwargs: float) -> dict[str, float]:
-        for key, val in kwargs.items():
-            new_val = self.prev_vals.get(key, val) * self.decay + val * (1. - self.decay)
-            self.prev_vals[key] = new_val
+    def __call__(self, new_val: float, /) -> float:
+        if self.prev_val is None:
+            self.prev_val = new_val
+        else:
+            self.prev_val = self.prev_val * self.decay + new_val * (1. - self.decay)
 
-        return self.prev_vals
+        return self.prev_val
