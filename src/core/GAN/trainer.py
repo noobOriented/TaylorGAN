@@ -7,12 +7,10 @@ import numpy as np
 import torch
 
 from core.models.sequence_modeling import TokenSequence
-from core.objectives import LossCollection
 from core.train import GeneratorUpdater, ModuleUpdater, Trainer
 from library.utils import cache_method_call
 
 from .discriminators import Discriminator, DiscriminatorLoss
-from core.GAN import discriminators
 
 
 class GANTrainer(Trainer):
@@ -49,23 +47,13 @@ class DiscriminatorUpdater(ModuleUpdater):
     module: Discriminator
     losses: t.Sequence[DiscriminatorLoss]
 
-    def update_step(self, real_samples, fake_samples):
+    def compute_loss(self, real_samples, fake_samples):
         with (
             cache_method_call(self.module, 'score_samples'),
             cache_method_call(self.module, 'score_word_vector'),
             cache_method_call(self.module, 'get_embedding'),
         ):
-            loss_collection: LossCollection = sum(
+            return sum(
                 loss(discriminator=self.module, real_samples=real_samples, fake_samples=fake_samples)
                 for loss in self.losses
-            )  # type: ignore
-
-        self.step += 1
-        self.optimizer.zero_grad()
-        loss_collection.total.backward()
-        losses = {
-            key: tensor.detach().numpy()
-            for key, tensor in loss_collection.observables.items()
-        }
-        self.hook(self.step, losses)
-        self.optimizer.step()
+            )

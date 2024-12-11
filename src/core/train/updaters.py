@@ -4,6 +4,7 @@ import typing as t
 import torch
 from more_itertools import first
 
+from core.models.sequence_modeling import TokenSequence
 from core.objectives.collections import LossCollection
 from library.utils import cache_method_call, logging_indent
 
@@ -26,8 +27,20 @@ class ModuleUpdater:
         self.hook = EventHook[int, t.Mapping[str, float]]()
 
     @abc.abstractmethod
-    def update_step(self):
-        pass
+    def compute_loss(self, *args, **kwargs) -> LossCollection:
+        ...
+
+    def update_step(self, *args, **kwargs):
+        loss = self.compute_loss(*args, **kwargs)
+        losses = {
+            key: tensor.detach().numpy()
+            for key, tensor in loss.observables.items()
+        }
+        self.hook(self.step, losses)
+        self.optimizer.zero_grad()
+        loss.total.backward()
+        self.optimizer.step()
+        self.step += 1
 
     def state_dict(self) -> dict:
         return {
@@ -63,19 +76,9 @@ def _count_numel(params) -> int:
 
 class GeneratorUpdater(ModuleUpdater):
 
-    def update_step(self, real_samples):
+    def compute_loss(self, real_samples: TokenSequence):
         with cache_method_call(self.module, 'generate'):
-            loss_collection: LossCollection = sum(
+            return sum(
                 loss(generator=self.module, real_samples=real_samples)
                 for loss in self.losses
             )  # type: ignore
-
-        self.step += 1
-        self.optimizer.zero_grad()
-        loss_collection.total.backward()
-        losses = {
-            key: tensor.detach().numpy()
-            for key, tensor in loss_collection.observables.items()
-        }
-        self.hook(self.step, losses)
-        self.optimizer.step()
