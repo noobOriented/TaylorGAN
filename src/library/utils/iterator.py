@@ -1,16 +1,6 @@
-from contextlib import contextmanager
+import typing as t
 
 import numpy as np
-from tqdm import tqdm
-import typing as t
-from .file_helper import count_lines
-
-
-@contextmanager
-def tqdm_open(filepath, mode='r'):
-    total = count_lines(filepath)
-    with open(filepath, mode) as f:
-        yield tqdm(f, total=total, unit='line')
 
 
 def batch_generator[S: t.Sequence | np.ndarray](

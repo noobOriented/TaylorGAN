@@ -69,17 +69,21 @@ class BLEUMetrics:
         self.max_gram = max_gram
 
     def calculate(self, tokens, **kwargs):
-        metrics = {}
+        metrics: dict[str, float] = {}
         for tag, calc in self.calculators.items():
-            mean_bleu = calc.mean_bleu(tokens)
-            metrics.update({f'{tag}_{key}': score for key, score in mean_bleu.items()})
+            mean_bleu = calc.bleu(tokens).mean(0)
+            metrics |= {
+                f'{tag}.BLEU-{i}': v
+                for i, v in enumerate(mean_bleu, 1)
+            }
 
-        metrics.update(BLEUCalculator.selfbleu(
+        selfbleu = BLEUCalculator.selfbleu(
             tokens,
             max_gram=self.max_gram,
             eos_idx=self.eos_idx,
             smoothing=SmoothingFunction.fuzz_smoothing,
-        ))
+        ).mean(0)
+        metrics |= {f'SBLEU-{i}': v for i, v in enumerate(selfbleu, 1)}
         return metrics
 
 

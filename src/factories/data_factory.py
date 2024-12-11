@@ -2,11 +2,12 @@ import functools
 import typing as t
 
 import pydantic
+import rich.progress
 import yaml
 
 from core.cache import cache_center
 from core.preprocess import CorpusConfig, PreprocessResult, TextDataset, Tokenizer
-from library.utils import format_id, format_path, logging_indent, tqdm_open
+from library.utils import logging_indent
 
 
 CONFIG_PATH = 'datasets/corpus.yaml'
@@ -21,7 +22,7 @@ class DataConfigs(pydantic.BaseModel):
     ] = None
 
     def load_data(self) -> PreprocessResult:
-        print(f"data_id: {format_id(self.dataset)}")
+        print(f"data_id: {self.dataset}")
 
         with logging_indent("Prepare text tokenizer..."):
             tokenizer = self._create_tokenizer()
@@ -41,7 +42,7 @@ class DataConfigs(pydantic.BaseModel):
         if p.exists():
             return Tokenizer.model_validate_json(p.read_text())
 
-        print(f'Build text mapper based on corpus data from {format_path(self._corpus_config.path["train"])}')
+        print(f'Build text mapper based on corpus data from {self._corpus_config.path["train"]}')
         tokenizer = Tokenizer.fit_corpus(self._corpus_config)
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(tokenizer.model_dump_json(indent=2))
@@ -52,8 +53,8 @@ class DataConfigs(pydantic.BaseModel):
         for key, path in self._corpus_config.path.items():
             @cache_center.to_npz(self._cache_key, f'{key}_data.npz')
             def _process_text_file(filepath):
-                print(f"Load corpus data from {format_path(filepath)}")
-                with tqdm_open(filepath) as f:
+                print(f"Load corpus data from {filepath}")
+                with rich.progress.open(filepath, 'r') as f:
                     return tokenizer.texts_to_array(f)
 
             with logging_indent(f"{key} data:", bullet=False):

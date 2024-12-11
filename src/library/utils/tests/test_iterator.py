@@ -1,14 +1,7 @@
 import numpy as np
 import pytest
 
-from ..iterator import batch_generator, tqdm_open
-
-
-def test_tqdm_open(tmpdir):
-    filepath = tmpdir / 'test_tqdm_open.txt'
-    filepath.write('tqdm_open\n' * 100)
-    with tqdm_open(filepath, 'r') as f_in:
-        assert all(line == 'tqdm_open\n' for line in f_in)
+from ..iterator import batch_generator
 
 
 class TestBatchGenerator:

@@ -4,8 +4,7 @@ import pathlib
 import typing as t
 
 import pydantic
-
-from library.utils import tqdm_open
+import rich.progress
 
 from ._segmentor import Segmentor
 
@@ -24,7 +23,7 @@ class CorpusConfig(pydantic.BaseModel):
         return v if isinstance(v, t.Mapping) else {'train': v}
 
     def iter_train_sentences(self) -> t.Iterator[list[str]]:
-        with tqdm_open(self.path['train']) as it:
+        with rich.progress.open(self.path['train'], 'r') as it:
             for s in it:
                 yield self.segmentor.segmentize_text(s)
 

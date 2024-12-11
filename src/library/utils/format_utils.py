@@ -1,54 +1,22 @@
+import itertools
 import typing as t
-from itertools import chain
 
-import termcolor
-
-
-def left_aligned(str_list: t.Iterable[str]) -> list[str]:
-    maxlen = max(map(len, str_list), default=0)
-    return [f"{s:<{maxlen}}" for s in str_list]
+import rich.text
 
 
-def format_list(lst):
-    return ', '.join(map(repr, lst))
+def format_highlight(string: str, level: int = 0):
+    if level == 0:
+        bolder = "*" + "-" * (len(string) + 2) + "*"
+        return rich.text.Text(f"{bolder}\n| {string.upper()} |\n{bolder}", style='bold yellow')
+    return rich.text.Text(string, style='green')
 
 
-def format_path(path: object) -> str:
-    return termcolor.colored(path, attrs=['underline'])
+def format_object(obj: object, /, *args: t.Any, **kwargs: t.Any):
+    return f"{obj.__class__.__name__}({_join_arg_string(*args, **kwargs)})"
 
 
-def format_id(id_str: str, bracket: bool = True) -> str:
-    return termcolor.colored(f"[{id_str}]" if bracket else id_str, 'cyan')
-
-
-def format_highlight(string: str) -> str:
-    bolder = "*" + "-" * (len(string) + 2) + "*"
-    return termcolor.colored(
-        f"{bolder}\n| {string.upper()} |\n{bolder}",
-        color='yellow',
-        attrs=['bold'],
-    )
-
-
-def format_highlight2(string: str) -> str:
-    return termcolor.colored(string, color='green')
-
-
-def format_object(obj, *args, **kwargs):
-    return f"{obj.__class__.__name__}({join_arg_string(*args, **kwargs)})"
-
-
-def join_arg_string(*args, sep=', ', **kwargs):
-    return sep.join(chain(
+def _join_arg_string(*args, sep=', ', **kwargs):
+    return sep.join(itertools.chain(
         map(str, args),
         (f"{k}={v}" for k, v in kwargs.items()),
     ))
-
-
-class FormatableMixin:
-
-    def __str__(self):
-        return format_object(self, **self.get_config())
-
-    def get_config(self):
-        return self.__dict__

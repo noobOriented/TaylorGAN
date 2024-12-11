@@ -1,12 +1,10 @@
-import numpy as np
 import typing as t
 
+import numpy as np
+import numpy.typing as npt
 
-def safe_divide(a, b):
-    return a / np.maximum(b, 1)
 
-
-def get_seqlens(data: np.ndarray, eos_idx):
+def get_seqlens(data: np.ndarray, eos_idx: int) -> npt.NDArray[np.uint]:
     data = np.asarray(data, dtype=np.int64)
     end_mask = np.equal(data, eos_idx)
     return np.where(
@@ -14,10 +12,6 @@ def get_seqlens(data: np.ndarray, eos_idx):
         np.argmax(end_mask, axis=1),  # position of eos
         data.shape[1],  # pad length
     )
-
-
-def unpad(sequences, lengths):
-    return map(lambda s, length: s[:length], sequences, lengths)
 
 
 def random_sample[T](arr: t.Sequence[T], size: int) -> t.Sequence[T]:

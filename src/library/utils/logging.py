@@ -1,95 +1,62 @@
 import builtins
-import sys
+import contextlib
+import functools
 import warnings
-from contextlib import contextmanager
-from functools import partial
+from unittest.mock import patch
 
-import termcolor
-from tqdm import tqdm
-from tqdm.contrib import DummyTqdmFile
+import rich
+import rich.text
 
-from .format_utils import format_highlight, format_highlight2
+from .format_utils import format_highlight
 
 
-STDOUT, STDERR, PRINT = sys.stdout, sys.stderr, builtins.print  # guaranteed builtins!!
-SEPARATION_LINE = termcolor.colored(' '.join(['-'] * 50), attrs=['dark'])
+PRINT = builtins.print = rich.print  # guaranteed builtins!!
+SEPARATION_LINE = rich.text.Text(' '.join('-' * 50), style='dark')
+BULLETS = ["•", "–", "*", "·"]
 
 
-@contextmanager
-def logging_indent(header: str = None, bullet: bool = True):
+class _IndentState:
+    level: int = 0
+
+
+@contextlib.contextmanager
+def logging_indent(header: str | None = None, bullet: bool = True):
     if header:
-        _IndentPrinter.print_header(header)
-
-    if _IndentPrinter.level == 0:  # need redirect
-        if builtins.print != PRINT:
-            warnings.warn("`logging_indent` should not be used with other redirector!")
-        builtins.print = partial(_IndentPrinter.print_body, bullet=bullet)
-
-    _IndentPrinter.level += 1
-    yield
-    _IndentPrinter.level -= 1
-
-    if _IndentPrinter.level == 0:  # need recover
-        builtins.print = PRINT
-    _IndentPrinter.print_footer()
-
-
-class _IndentPrinter:
-
-    '''DO NOT use it with TqdmRedirector!!!'''
-
-    BULLETS = ["•", "–", "*", "·"]
-    level = 0
-
-    @classmethod
-    def print_header(cls, header):
-        if cls.level == 0:
+        if _IndentState.level == 0:
             print(format_highlight(header))
-        elif cls.level == 1:
-            print(format_highlight2(header))
+        elif _IndentState.level == 1:
+            print(format_highlight(header, 1))
         else:
             print(header)
 
-    @classmethod
-    def print_body(cls, *args, bullet: bool = True, **kwargs):
-        assert cls.level > 0
-        if cls.level < 2:
-            PRINT(*args, **kwargs)
-        elif bullet:
-            bullet_symbol = cls.BULLETS[min(cls.level, len(cls.BULLETS)) - 1]
-            PRINT(' ' * (2 * cls.level - 2) + bullet_symbol, *args, **kwargs)
-        else:
-            PRINT(' ' * (2 * cls.level - 3), *args, **kwargs)
+    contexts: list[contextlib.AbstractContextManager] = []
+    if _IndentState.level == 0:  # need redirect
+        if print != PRINT:
+            warnings.warn("`logging_indent` should not be used with other redirector!")
 
-    @classmethod
-    def print_footer(cls):
-        if cls.level == 0:
-            print(SEPARATION_LINE)
-        elif cls.level == 1:
-            print()
+        contexts += [
+            patch.object(builtins, 'print', functools.partial(_print_body, bullet=bullet)),
+            patch.object(rich, 'print', functools.partial(_print_body, bullet=bullet)),
+        ]
+
+    contexts.append(patch.object(_IndentState, 'level', _IndentState.level + 1))
+    with contextlib.ExitStack() as stack:
+        for ctx in contexts:
+            stack.enter_context(ctx)
+        yield
+
+    if _IndentState.level == 0:
+        print(SEPARATION_LINE)
+    elif _IndentState.level == 1:
+        print()
 
 
-class TqdmRedirector:
-
-    STDOUT, STDERR, PRINT = STDOUT, STDERR, PRINT
-
-    @classmethod
-    def enable(cls):
-        if (sys.stdout, sys.stderr, builtins.print) != (STDOUT, STDERR, PRINT):
-            warnings.warn(f"`{cls.__name__}` should not be used with other redirector!")
-
-        tqdm_out, tqdm_err = DummyTqdmFile(STDOUT), DummyTqdmFile(STDERR)
-        STREAMS_TO_REDIRECT = {None, STDOUT, STDERR, tqdm_out, tqdm_err}
-
-        def new_print(*values, sep=' ', end='\n', file=None, flush=False):
-            if file in STREAMS_TO_REDIRECT:
-                # NOTE tqdm (v4.40.0) can't support end != '\n' and flush
-                tqdm.write(sep.join(map(str, values)), file=STDOUT)
-            else:
-                PRINT(*values, sep=sep, end=end, file=file, flush=flush)
-
-        sys.stdout, sys.stderr, builtins.print = tqdm_out, tqdm_err, new_print
-
-    @classmethod
-    def disable(cls):
-        sys.stdout, sys.stderr, builtins.print = STDOUT, STDERR, PRINT
+def _print_body(*args, bullet: bool = True, **kwargs):
+    level = _IndentState.level
+    if level < 2:
+        PRINT(*args, **kwargs)
+    elif bullet:
+        bullet_symbol = BULLETS[min(level, len(BULLETS)) - 1]
+        PRINT(' ' * (2 * level - 4) + bullet_symbol, *args, **kwargs)
+    else:
+        PRINT(' ' * (2 * level - 3), *args, **kwargs)

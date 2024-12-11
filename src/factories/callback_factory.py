@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import collections
+import dataclasses
 import os
 import pathlib
 import sys
@@ -10,15 +11,20 @@ import warnings
 
 import numpy as np
 import pydantic
-import termcolor
+import rich
+import rich.live
+import rich.panel
+import rich.progress
+import rich.table
 import torch
 
 from core.evaluate import TextGenerator
 from core.models.generators import Generator
 from core.preprocess import PreprocessResult
 from core.train import Callback, EventHook, ModelCheckpointSaver, Trainer
-from core.train.loggers import ProgbarLogger
-from library.utils import SEPARATION_LINE, get_seqlens, logging_indent, random_sample
+from library.utils import (
+    SEPARATION_LINE, ExponentialMovingAverageMeter, get_seqlens, logging_indent, random_sample,
+)
 
 
 class CallbackConfigs(pydantic.BaseModel):
@@ -72,28 +78,23 @@ class CallbackConfigs(pydantic.BaseModel):
         return creator.callback
 
 
+@dataclasses.dataclass
 class _CallbackCreator:
-
-    def __init__(
-        self,
-        args: CallbackConfigs,
-        generator: Generator,
-        trainer: Trainer,
-        data: PreprocessResult,
-        checkpoint: str | os.PathLike[str] | None,
-        base_tag: str | None = None,
-    ):
-        self.args = args
-        self.data = data
-        self.generator = generator
-        self.trainer = trainer
-        self.checkpoint = checkpoint
+    args: CallbackConfigs
+    generator: Generator
+    trainer: Trainer
+    data: PreprocessResult
+    checkpoint: str | os.PathLike[str] | None
+    base_tag: str | None = None
+    
+    def __post_init__(self):
         self.callback = Callback()
-
-        base_tag = base_tag or f"{data.cache_key}@{time.strftime('%Y%m%d-%H%M%S')}"
-        self.tag = pathlib.Path(*self.args.tags, base_tag)
+        self.tag = '/'.join([
+            *self.args.tags,
+            self.base_tag or f"{self.data.cache_key}@{time.strftime('%Y%m%d-%H%M%S')}",
+        ])
         self.text_generator = TextGenerator(self.generator, tokenizer=self.data.tokenizer)
-        self.metric_channels = collections.defaultdict(EventHook[int, t.Mapping[str, float]])
+        self.metric_update_hooks = collections.defaultdict[str, EventHook[int, t.Any]](EventHook)
 
     def attach_events(self):
         self._attach_evaluators()
@@ -132,11 +133,11 @@ class _CallbackCreator:
     def _attach_evaluators(self):
 
         @self.trainer.generator_updater.hook.attach
-        def calculate_mean_length(batch: int, _, hook=self.metric_channels['samples']):
+        def calculate_mean_length(batch: int, _, hook=self.metric_update_hooks['avg length']):
             if batch % 10 == 0:
                 ids = self.text_generator.generate_ids(10)
                 mean_length = np.mean(get_seqlens(ids, self.data.special_tokens.EOS.idx))
-                hook(batch, {'mean_length': float(mean_length)})
+                hook(batch, float(mean_length))
 
         @self.trainer.generator_updater.hook.attach
         def log_texts(batch: int, _):
@@ -144,10 +145,10 @@ class _CallbackCreator:
                 sentences = self.text_generator.generate_texts(3)
                 print(SEPARATION_LINE)
                 print()
-                print(termcolor.colored("Real Sentences (Random Sampled):", 'blue'))
+                rich.print('[blue]Real Sentences (random sampled):')
                 _print_samples(random_sample(self.data.dataset['train'].texts, len(sentences)))
                 print()
-                print(termcolor.colored("Fake Sentences (Random Sampled):", 'red'))
+                rich.print('[red]Fake Sentences (random sampled):')
                 _print_samples(sentences)
                 print()
 
@@ -166,25 +167,22 @@ class _CallbackCreator:
                     )
 
                 @self.trainer.generator_updater.hook.attach
-                def bleu(batch: int, _, /, calculator=calculator, hook=self.metric_channels[tag]):
+                def compute_bleu(batch: int, _, c=calculator, hook=self.metric_update_hooks[f'{tag} BLEU 1~{ngram}']):
                     if batch % 10 == 0:
                         ids = self.text_generator.generate_ids(self.args.batch_size)
-                        result = calculator.mean_bleu(ids)
-                        hook(batch, result)
+                        mean_bleu = c.bleu(ids).mean(0)
+                        hook(batch, mean_bleu)
 
             @self.callback.on_epoch_end.attach
-            def self_bleu(epoch: int, hook=self.metric_channels['samples']):
+            def compute_selfbleu(epoch: int, hook=self.metric_update_hooks[f'self BLEU 1~{ngram}']):
                 ids = self.text_generator.generate_ids(len(self.data.dataset['train']))
-
-                print("Evaluating generated data SelfBLEU...")
-                print()
-                selfbleu = BLEUCalculator.selfbleu(
+                mean_sbleu = BLEUCalculator.selfbleu(
                     ids,
                     max_gram=ngram,
                     eos_idx=self.data.special_tokens.EOS.idx,
                     smoothing=SmoothingFunction.fuzz_smoothing,
-                )
-                hook(epoch, selfbleu)
+                ).mean(0)
+                hook(epoch, mean_sbleu)
 
         if fed_sample_size := self.args.fed:
             from core.evaluate import FEDCalculator
@@ -197,26 +195,23 @@ class _CallbackCreator:
                 )
 
                 @self.callback.on_epoch_end.attach
-                def fed(epoch: int, calculator=calculator, hook=self.metric_channels[tag]):
+                def compute_fed(epoch: int, calculator=calculator, hook=self.metric_update_hooks[f'{tag}.FED']):
                     texts = self.generator.generate_texts(fed_sample_size)
-                    d = {'FED': calculator.calculate_fed_score(texts)}
-                    hook(epoch, d)
+                    score = calculator.calculate_fed_score(texts)
+                    hook(epoch, score)
 
     def _attach_loggers(self):
-        bar = ProgbarLogger(
-            desc=str(self.tag),
-            total=len(self.data.dataset['train']),
-            module_update_hooks={
-                u.info: u.hook
-                for u in self.trainer.updaters
-            },
-            metric_update_hooks=self.metric_channels,
+        table = rich.table.Table.grid()
+        table.add_row(str(self.tag), style='purple bold')
+        table.add_row(
+            self._create_modules_panel(),
+            self._create_metric_panel(),
         )
-        self.callback.on_train_begin.attach(bar.on_train_begin)
-        self.callback.on_epoch_begin.attach(bar.on_epoch_begin)
-        self.callback.on_batch_end.attach(bar.on_batch_end)
-        self.callback.on_epoch_end.attach(bar.on_epoch_end)
-        self.callback.on_train_end.attach(bar.on_train_end)
+        table.add_row(self._create_data_progress())
+
+        live = rich.live.Live(table, refresh_per_second=10)
+        self.callback.on_train_begin.attach(live.start)
+        self.callback.on_train_end.attach(live.stop)
 
         if self.args.tensorboard:
             from tensorboardX import SummaryWriter
@@ -244,15 +239,14 @@ class _CallbackCreator:
                                 global_step=step,  # TODO enerator step?
                             )
 
-            for name, channel in self.metric_channels.items():
+            for name, channel in self.metric_update_hooks.items():
                 @channel.attach
-                def update_metrics(step: int, vals: t.Mapping):
-                    for key, val in vals.items():
-                        writer.add_scalar(
-                            tag=f'{name}/{key}',
-                            scalar_value=val,
-                            global_step=step,  # TODO batch ? epoch?
-                        )
+                def update_metrics(step: int, val: float, tag=name.replace('.', '/')):
+                    writer.add_scalar(
+                        tag,
+                        scalar_value=val,
+                        global_step=step,  # TODO batch ? epoch?
+                    )
 
     def _attach_savers(self):
         if self.args.serving_root:
@@ -289,6 +283,72 @@ class _CallbackCreator:
 
         else:
             warnings.warn("`checkpoint_root` is not given. Training can't be restored!")
+
+    def _create_modules_panel(self):
+
+        def format_losses(losses: t.Mapping[str, float], /):
+            return ' '.join(f'{k}={v:.3}' for k, v in losses.items())
+
+        table = rich.table.Table.grid()
+
+        for updater in self.trainer.updaters:
+            progress = rich.progress.Progress('updates={task.completed}', '{task.fields[losses]}')
+            task_id = progress.add_task('', losses='nan')
+            ema = ExponentialMovingAverageMeter(decay=0.9)
+
+            @updater.hook.attach
+            def _(step, losses, progress=progress, task_id=task_id, ema=ema):
+                losses = ema.apply(**losses)
+                progress.update(task_id, advance=1, losses=_LazyFormatter(losses, format_losses))
+
+            table.add_row(
+                rich.panel.Panel(progress, border_style='blue', title=updater.module.scope, padding=(0, 2)),
+            )
+
+        return table
+
+    def _create_metric_panel(self):
+        progress = rich.progress.Progress('[cyan]{task.description}', '{task.fields[value]:.3}')
+
+        def formatter(v, /):
+            return np.array2string(np.asarray(v), precision=3).strip('[]')
+
+        for name, hook in self.metric_update_hooks.items():
+            task_id = progress.add_task(name, value='nan')
+            @hook.attach
+            def _(step, val, task_id=task_id):
+                progress.update(task_id, value=_LazyFormatter(val, formatter))
+
+        return rich.panel.Panel(progress, title='Metrics', border_style='cyan', padding=(1, 1))
+
+    def _create_data_progress(self):
+        progress = rich.progress.Progress(
+            '[progress.description]{task.description}',
+            rich.progress.SpinnerColumn(),
+            rich.progress.BarColumn(),
+            rich.progress.MofNCompleteColumn(),
+            rich.progress.TimeRemainingColumn(),
+        )
+        task_id = progress.add_task('', total=len(self.data.dataset['train']))
+
+        @self.callback.on_epoch_begin.attach
+        def reset_databar(epoch):
+            progress.reset(task_id, description=f'Epoch {epoch}')
+
+        @self.callback.on_batch_end.attach
+        def update_databar(batch: int, batch_data):
+            progress.update(task_id, advance=len(batch_data))
+
+        return progress
+
+
+@dataclasses.dataclass
+class _LazyFormatter[T]:
+    wrapped: T
+    func: t.Callable[[T], str]
+
+    def __format__(self, __format_spec):
+        return self.func(self.wrapped)
 
 
 def _print_samples(texts: t.Sequence[str], /):

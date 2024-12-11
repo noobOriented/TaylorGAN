@@ -1,7 +1,7 @@
 import os
 
 from core.train import DataLoader, ModelCheckpointSaver
-from library.utils import logging_indent, parse_args_as
+from library.utils import format_highlight, logging_indent, parse_args_as
 from scripts.snippets import set_global_random_seed
 
 from ._configs import GANTrainingConfigs, MLETrainingConfigs
@@ -57,4 +57,5 @@ def main(
         trainer.load_state(path=checkpoint)
         data_loader.skip_epochs(ModelCheckpointSaver.epoch_number(checkpoint))
 
+    print(format_highlight("Start Training"))
     trainer.fit(data_loader)

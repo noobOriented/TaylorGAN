@@ -7,7 +7,6 @@ import numpy as np
 import torch
 
 from core.models.sequence_modeling import TokenSequence
-from library.utils import format_path
 
 from .updaters import DiscriminatorUpdater, GeneratorUpdater
 
@@ -89,7 +88,7 @@ class ModelCheckpointSaver:
     def save(self, epoch: int):
         path = self.directory / self.checkpoint_basename(epoch)
         self.trainer.save_state(path)
-        print(f"saving checkpoint to {format_path(path)}")
+        print(f"saving checkpoint to {path}")
 
     @classmethod
     def checkpoint_basename(cls, epoch: int) -> str:

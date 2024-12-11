@@ -4,10 +4,10 @@ from collections import Counter, defaultdict
 
 import numpy as np
 import numpy.typing as npt
-from tqdm import tqdm
+import rich.progress
 
 from core.cache import cache_center
-from library.utils import counter_or, get_seqlens, safe_divide, unpad
+from library.utils import counter_or, get_seqlens
 
 
 class BLEUCalculator:
@@ -34,24 +34,12 @@ class BLEUCalculator:
         ]
         self.brevity_penalty = get_brevity_penalty_table(ref_lengths, maxlen=references.shape[1])
 
-    def mean_bleu(self, candidates: npt.NDArray[np.uint]) -> dict[str, float]:
-        mean_bleu = np.mean(self.bleu(candidates), axis=0)  # shape (max_gram)
-        return {
-            f"BLEU-{n}": bleu_n
-            for n, bleu_n in enumerate(mean_bleu, 1)
-        }
-
     @classmethod
-    def selfbleu(cls, samples: npt.NDArray, **kwargs) -> dict[str, float]:
+    def selfbleu(cls, samples: npt.NDArray[np.uint], **kwargs):
         candidates, references = np.split(samples, 2)
-        bleu = cls(references, **kwargs).bleu(candidates)
-        mean_bleu = np.mean(bleu, axis=0)  # shape (max_gram)
-        return {
-            f'SBLEU-{n}': bleu_n
-            for n, bleu_n in enumerate(mean_bleu, 1)
-        }
+        return cls(references, **kwargs).bleu(candidates)
 
-    def bleu(self, candidates: np.ndarray) -> np.ndarray:
+    def bleu(self, candidates: npt.NDArray[np.uint]) -> npt.NDArray[np.floating]:
         candidates = np.asarray(candidates, dtype=self.INT_DTYPE)
         cand_lens = get_seqlens(candidates, eos_idx=self.eos_idx)
 
@@ -74,7 +62,7 @@ class BLEUCalculator:
         total_count = seqlens[:, np.newaxis] - np.arange(self.max_gram)
         if self.smoothing:
             clipped_count, total_count = self.smoothing(clipped_count, total_count)
-        return safe_divide(clipped_count, total_count)  # avoid zero division
+        return clipped_count / np.maximum(total_count, 1)  # avoid zero division
 
     def _clipped_count(self, candidate: np.ndarray):
         return [ref_counter.clipped_count(candidate) for ref_counter in self.ref_counters]
@@ -92,7 +80,7 @@ class NGramCounter:
             seqs = unpad(references, seqlens)
             if verbose:
                 print(f"Building {n}-gram table...")
-                seqs = tqdm(seqs, total=len(references), unit='sample')
+                seqs = rich.progress.track(seqs, total=len(references))
             return counter_or(Counter(hashable_ngrams(s, n)) for s in seqs)
 
         if cache_dir:
@@ -117,11 +105,14 @@ def cum_geomean(arr, axis=-1):
 def get_brevity_penalty_table(ref_lengths, maxlen):
     possible_lengths = np.arange(maxlen + 1)
     closest_lengths = get_closest_values(possible_lengths, target=ref_lengths)
-    brevity_penalty = np.minimum(
-        np.exp(1. - safe_divide(closest_lengths, possible_lengths)),
+    return np.minimum(
+        np.exp(1. - closest_lengths / np.maximum(possible_lengths, 1)),
         1.,
     )
-    return brevity_penalty
+
+
+def unpad(sequences, lengths):
+    return (s[:length] for s, length in zip(sequences, lengths))
 
 
 def get_closest_values(arr: np.ndarray, target: np.ndarray):
