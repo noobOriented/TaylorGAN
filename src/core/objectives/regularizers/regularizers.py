@@ -9,8 +9,6 @@ from .base import Regularizer
 
 class EntropyRegularizer(Regularizer):
 
-    loss_name = 'entropy'
-
     def __call__(self, generator: AutoRegressiveGenerator, real_samples: TokenSequence):
         fake_samples = generator.generate(real_samples.batch_size, real_samples.maxlen)
         # NOTE it's biased

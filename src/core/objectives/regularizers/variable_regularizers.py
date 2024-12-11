@@ -8,7 +8,6 @@ from .base import Regularizer
 
 
 class VariableRegularizer(Regularizer):
-    loss_name: str
 
     def __call__(self, generator=None, discriminator=None, **kwargs):
         if generator and discriminator:
@@ -21,8 +20,6 @@ class VariableRegularizer(Regularizer):
 
 class EmbeddingRegularizer(VariableRegularizer):
 
-    loss_name = 'embedding'
-
     def __init__(self, max_norm: float = 0.):
         self.max_norm = max_norm
 
@@ -34,8 +31,6 @@ class EmbeddingRegularizer(VariableRegularizer):
 
 
 class SpectralRegularizer(VariableRegularizer):
-
-    loss_name = 'spectral'
 
     def compute_loss_of_module(self, module: ModuleInterface):
         loss = 0

@@ -15,7 +15,7 @@ from core.GAN import (
 from core.models import Generator
 from core.objectives import MLEObjective
 from core.objectives.regularizers import (
-    EmbeddingRegularizer, EntropyRegularizer, LossScaler, Regularizer, SpectralRegularizer,
+    EmbeddingRegularizer, EntropyRegularizer, Regularizer, SpectralRegularizer,
 )
 from core.preprocess import PreprocessResult
 from core.train import GeneratorUpdater, NonParametrizedTrainer
@@ -25,7 +25,7 @@ from library.torch_zoo.nn.masking import (
     MaskAvgPool1d, MaskConv1d, MaskGlobalAvgPool1d, MaskSequential,
 )
 from library.torch_zoo.nn.resnet import ResBlock
-from library.utils import ArgumentBinder, LookUpCall
+from library.utils import ArgumentBinder, LookUpCall, wraps_with_new_signature
 
 
 class MLEObjectiveConfigs(pydantic.BaseModel):
@@ -33,10 +33,10 @@ class MLEObjectiveConfigs(pydantic.BaseModel):
     g_regularizers: list[str] = []
 
     def get_trainer(self, data: PreprocessResult, generator: Generator):
-        losses: dict[str, Regularizer] = {'NLL': MLEObjective()}
+        losses: dict[str, tuple[Regularizer, float]] = {'NLL': (MLEObjective(), 1)}
         for s in self.g_regularizers:
-            reg, info = _G_REGS(s, return_info=True)
-            losses[info.func_name] = reg
+            (reg, coeff), info = _G_REGS(s, return_info=True)
+            losses[info.func_name] = (reg, coeff)
 
         generator_updater = GeneratorUpdater(
             generator,
@@ -66,15 +66,15 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             generator_loss=self._loss_tuple.generator_loss,
             estimator=_ESTIMATORS(self.estimator),
         )
-        g_losses: dict[str, Regularizer] = {'adv': objective}
+        g_losses: dict[str, tuple[Regularizer, float]] = {'adv': (objective, 1)}
         for s in self.g_regularizers:
-            reg, info = _G_REGS(s, return_info=True)
-            g_losses[info.func_name] = reg
+            (reg, coeff), info = _G_REGS(s, return_info=True)
+            g_losses[info.func_name] = (reg, coeff)
 
-        d_losses: dict[str, Regularizer] = {'BCE': self._loss_tuple.discriminator_loss}
+        d_losses: dict[str, tuple[Regularizer, float]] = {'BCE': (self._loss_tuple.discriminator_loss, 1)}
         for s in self.d_regularizers:
-            reg, info = _D_REGS(s, return_info=True)
-            d_losses[info.func_name] = reg
+            (reg, coeff), info = _D_REGS(s, return_info=True)
+            d_losses[info.func_name] = (reg, coeff)
 
         generator_updater = GeneratorUpdater(
             generator,
@@ -153,10 +153,21 @@ def resnet(input_size, activation: activations.TYPE_HINT = 'relu'):
     )
 
 
+def _concat_coeff[**P, T](
+    regularizer_cls: t.Callable[P, T],
+) -> t.Callable[t.Concatenate[float, P], tuple[T, float]]:
+
+    @wraps_with_new_signature(regularizer_cls)
+    def wrapper(coeff: float, *args, **kwargs):
+        return regularizer_cls(*args, **kwargs), coeff
+
+    return wrapper
+
+
 _G_REGS = LookUpCall({
-    'spectral': LossScaler.as_constructor(SpectralRegularizer),
-    'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
-    'entropy': LossScaler.as_constructor(EntropyRegularizer),
+    'spectral': _concat_coeff(SpectralRegularizer),
+    'embedding': _concat_coeff(EmbeddingRegularizer),
+    'entropy': _concat_coeff(EntropyRegularizer),
 })
 _OPTIMIZERS = LookUpCall({
     key: ArgumentBinder(add_custom_optimizer_args(optim_cls), preserved=['params'])
@@ -182,8 +193,8 @@ _ESTIMATORS = LookUpCall({
     'gumbel': GumbelSoftmaxEstimator,
 })
 _D_REGS = LookUpCall({
-    'spectral': LossScaler.as_constructor(SpectralRegularizer),
-    'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
-    'grad_penalty': LossScaler.as_constructor(GradientPenaltyRegularizer),
-    'word_vec': LossScaler.as_constructor(WordVectorRegularizer),
+    'spectral': _concat_coeff(SpectralRegularizer),
+    'embedding': _concat_coeff(EmbeddingRegularizer),
+    'grad_penalty': _concat_coeff(GradientPenaltyRegularizer),
+    'word_vec': _concat_coeff(WordVectorRegularizer),
 })

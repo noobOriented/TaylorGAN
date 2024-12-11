@@ -10,7 +10,7 @@ from core.models.sequence_modeling import TokenSequence
 from core.train import GeneratorUpdater, ModuleUpdater, Trainer
 from library.utils import cache_method_call
 
-from .discriminators import Discriminator, DiscriminatorLoss
+from .discriminators import Discriminator
 
 
 class GANTrainer(Trainer):
@@ -44,7 +44,6 @@ class GANTrainer(Trainer):
 
 
 class DiscriminatorUpdater(ModuleUpdater[Discriminator]):
-    losses: dict[str, DiscriminatorLoss]
 
     def compute_loss(self, real_samples, fake_samples):
         with (
@@ -54,5 +53,5 @@ class DiscriminatorUpdater(ModuleUpdater[Discriminator]):
         ):
             return {
                 name: loss(discriminator=self.module, real_samples=real_samples, fake_samples=fake_samples)
-                for name, loss in self.losses.items()
+                for name, (loss, _) in self.losses.items()
             }

@@ -17,7 +17,10 @@ class ModuleUpdater[T: torch.nn.Module]:
         self,
         module: T,
         optimizer: torch.optim.Optimizer,
-        losses: t.Mapping[str, t.Callable[..., torch.Tensor]],
+        losses: t.Mapping[
+            str,
+            tuple[t.Callable[..., torch.Tensor], float]
+        ],
     ):
         self.module = module
         self.optimizer = optimizer
@@ -32,7 +35,7 @@ class ModuleUpdater[T: torch.nn.Module]:
 
     def update_step(self, *args, **kwargs):
         losses = self.compute_loss(*args, **kwargs)
-        sum_loss: torch.Tensor = sum(losses.values())
+        sum_loss: torch.Tensor = sum(self.losses[k][1] * v for k, v in losses.items())
         loss_vals = {k: v.detach().numpy() for k, v in losses.items()}
         self.hook(self.step, loss_vals)
         self.optimizer.zero_grad()
@@ -78,5 +81,5 @@ class GeneratorUpdater(ModuleUpdater[Generator]):
         with cache_method_call(self.module, 'generate'):
             return {
                 name: loss(generator=self.module, real_samples=real_samples)
-                for name, loss in self.losses.items()
+                for name, (loss, _) in self.losses.items()
             }
