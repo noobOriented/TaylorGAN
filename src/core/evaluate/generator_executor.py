@@ -1,8 +1,11 @@
+import typing as t
+
 import numpy as np
 import numpy.typing as npt
 import torch
 
 from core.models import Generator
+from core.models.generators import AutoRegressiveGenerator
 from core.preprocess import Tokenizer
 from library.utils import batch_generator
 
@@ -37,15 +40,16 @@ class TextGenerator:
 
     def perplexity(self, inputs: np.ndarray) -> float:
         total_NLL = total_words = 0.
+        generator = t.cast(AutoRegressiveGenerator, self.generator)
         with torch.no_grad():
             for batch_array in batch_generator(inputs, self.BATCH_SIZE):
                 batch_tensor = torch.from_numpy(batch_array)
-                batch_NLL = self.generator.seq_neg_logprobs(batch_tensor)
+                batch_NLL = generator.seq_neg_logprobs(batch_tensor)
                 total_NLL += batch_NLL.sum()
                 # TODO seqlen
                 total_words += inputs.shape[0] * inputs.shape[1]
 
-        avg_NLL = total_NLL / total_words
+        avg_NLL: torch.Tensor = total_NLL / total_words
         perplexity = avg_NLL.exp().numpy()
         return perplexity
 

@@ -2,27 +2,26 @@ import abc
 from itertools import chain
 
 import torch
-from torch.nn import Module
 
 from core.preprocess import SpecialToken
 from library.torch_zoo.functions import random_choice_by_logits
 
 from .interfaces import ModuleInterface
-from .sequence_modeling import SampledTokenSequence
+from .sequence_modeling import SampledTokenSequence, TokenSequence
 
 
-class Generator(Module, ModuleInterface):
+class Generator(torch.nn.Module, ModuleInterface):
 
     scope = 'Generator'
 
-    def __init__(self, embedder: Module, special_tokens: type[SpecialToken]):
+    def __init__(self, embedder: torch.nn.Module, special_tokens: type[SpecialToken]):
         super().__init__()
         self.embedder = embedder
         self.special_tokens = special_tokens
 
     @abc.abstractmethod
-    def generate(self, batch_size, maxlen, temperature):
-        pass
+    def generate(self, batch_size: int, maxlen: int, temperature: float | None = None) -> TokenSequence:
+        ...
 
     @property
     def embedding_matrix(self):
@@ -33,9 +32,9 @@ class AutoRegressiveGenerator(Generator):
 
     def __init__(
         self,
-        cell: Module,
-        embedder: Module,
-        output_layer: Module,
+        cell: torch.nn.Module,
+        embedder: torch.nn.Module,
+        output_layer: torch.nn.Module,
         special_tokens: type[SpecialToken],
     ):
         super().__init__(embedder, special_tokens)
@@ -62,9 +61,9 @@ class AutoRegressiveGenerator(Generator):
             gv_list.append(gv)
 
         return SampledTokenSequence(
-            logits=torch.stack(logits_list, axis=1),
-            ids=torch.stack(ids_list, axis=1),
-            gumbel_vars=torch.stack(gv_list, axis=1),
+            logits=torch.stack(logits_list, dim=1),
+            ids=torch.stack(ids_list, dim=1),
+            gumbel_vars=torch.stack(gv_list, dim=1),
             eos_idx=self.special_tokens.EOS.idx,
             pad_idx=self.special_tokens.PAD.idx,
         )
@@ -72,7 +71,7 @@ class AutoRegressiveGenerator(Generator):
     def forward(self, batch_size, maxlen, temperature=None):
         return self.generate(batch_size, maxlen, temperature).ids
 
-    def seq_neg_logprobs(self, word_ids: torch.Tensor) -> SampledTokenSequence:
+    def seq_neg_logprobs(self, word_ids: torch.Tensor) -> torch.Tensor:
         word_ids = word_ids.type(torch.int64)
         sos_idx, state = self._get_start_token_and_state(batch_size=word_ids.shape[0])
         logits_list = []

@@ -1,20 +1,18 @@
 import torch
-from torch.nn import Embedding, Linear, Module
 
 from .interfaces import ModuleInterface
 from .sequence_modeling import TokenSequence
 
 
-class Discriminator(Module, ModuleInterface):
+class Discriminator(torch.nn.Module, ModuleInterface):
 
     scope = 'Discriminator'
 
-    def __init__(self, network: Module, embedder: Embedding):
+    def __init__(self, network: torch.nn.Module, embedder: torch.nn.Embedding):
         super().__init__()
         self.network = network
         self.embedder = embedder
-
-        self.binary_output_layer = Linear(
+        self.binary_output_layer = torch.nn.Linear(
             in_features=network(
                 torch.zeros([1, 20, embedder.embedding_dim]),
             ).shape[-1],
@@ -33,7 +31,7 @@ class Discriminator(Module, ModuleInterface):
         return self.binary_output_layer(features)
 
     @property
-    def networks(self):
+    def networks(self) -> list[torch.nn.Module]:
         return [self.embedder, self.network, self.binary_output_layer]
 
     @property

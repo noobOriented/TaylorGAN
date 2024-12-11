@@ -1,4 +1,5 @@
 import abc
+import typing as t
 
 import torch
 
@@ -7,16 +8,12 @@ from library.utils import ObjectWrapper, format_object, wraps_with_new_signature
 from ..collections import LossCollection
 
 
-class Regularizer(abc.ABC):
+class Regularizer(t.Protocol):
+    loss_name: str
 
     @abc.abstractmethod
     def __call__(self, **kwargs) -> LossCollection:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def loss_name(self) -> str:
-        pass
+        ...
 
 
 class LossScaler(ObjectWrapper):
@@ -28,11 +25,10 @@ class LossScaler(ObjectWrapper):
 
     def __call__(self, **kwargs):
         loss = self.regularizer(**kwargs)
-        if isinstance(loss, torch.Tensor):
-            observables = {self.regularizer.loss_name: loss}
-        else:
-            loss, observables = loss
-
+        if isinstance(loss, LossCollection):
+            return loss
+        
+        observables = {self.regularizer.loss_name: loss}
         return LossCollection(self.coeff * loss, **observables)
 
     @classmethod

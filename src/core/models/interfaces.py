@@ -1,14 +1,17 @@
 import abc
-from itertools import chain
+import typing as t
+
+import more_itertools
+import torch
 
 
-class ModuleInterface:
+class ModuleInterface(t.Protocol):
 
     def parameters(self):
-        return chain.from_iterable(network.parameters() for network in self.networks)
+        return more_itertools.flatten(network.parameters() for network in self.networks)
 
     def modules(self):
-        return chain.from_iterable(network.modules() for network in self.networks)
+        return more_itertools.flatten(network.modules() for network in self.networks)
 
     @property
     def trainable_variables(self):
@@ -20,5 +23,5 @@ class ModuleInterface:
 
     @property
     @abc.abstractmethod
-    def networks(self):
-        raise NotImplementedError
+    def networks(self) -> list[torch.nn.Module]:
+        ...

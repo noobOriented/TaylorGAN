@@ -7,7 +7,7 @@ from library.torch_zoo.functions import random_choice_by_logits, takewhile_mask
 
 class TokenSequence:
 
-    def __init__(self, ids: torch.Tensor, eos_idx: int = None, pad_idx: int = None):
+    def __init__(self, ids: torch.Tensor, eos_idx: int | None = None, pad_idx: int | None = None):
         if eos_idx is not None:
             self.mask = takewhile_mask(torch.not_equal(ids, eos_idx))
             if pad_idx is not None:
@@ -15,6 +15,7 @@ class TokenSequence:
                 ids = torch.where(self.mask, ids, pad_idx_tensor)
         else:
             self.mask = None
+
         self.ids = ids
 
     @property
@@ -35,13 +36,13 @@ class TokenSequence:
 class SampledTokenSequence(TokenSequence):
 
     def __init__(
-            self,
-            logits: torch.Tensor,
-            ids: torch.Tensor = None,
-            gumbel_vars: torch.Tensor = None,
-            eos_idx: int = None,
-            pad_idx: int = None,
-        ):
+        self,
+        logits: torch.Tensor,
+        ids: torch.Tensor | None = None,
+        gumbel_vars: torch.Tensor | None = None,
+        eos_idx: int | None = None,
+        pad_idx: int | None = None,
+    ):
         if ids is None:
             ids, gumbel_vars = random_choice_by_logits(logits, return_gumbel=True)
 
@@ -72,5 +73,4 @@ def seq_neg_logprobs(logits, ids, mask=None):
 
     if mask is not None:
         return (neg_logprobs * mask.type_as(neg_logprobs)).sum(dim=-1)  # (N, )
-    else:
-        return neg_logprobs.sum(dim=-1)
+    return neg_logprobs.sum(dim=-1)
