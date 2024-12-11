@@ -5,9 +5,8 @@ import torch
 from more_itertools import first
 
 from core.objectives.collections import LossCollection
-from library.utils import logging_indent, cache_method_call
+from library.utils import cache_method_call, logging_indent
 
-from .optimizer import OptimizerWrapper
 from .pubsub import EventHook
 
 
@@ -16,7 +15,7 @@ class ModuleUpdater:
     def __init__(
         self,
         module: torch.nn.Module,
-        optimizer: OptimizerWrapper,
+        optimizer: torch.optim.Optimizer,
         losses: t.Sequence[t.Callable[..., LossCollection]],
     ):
         self.module = module
@@ -66,10 +65,10 @@ class GeneratorUpdater(ModuleUpdater):
 
     def update_step(self, real_samples):
         with cache_method_call(self.module, 'generate'):
-            loss_collection = sum(
+            loss_collection: LossCollection = sum(
                 loss(generator=self.module, real_samples=real_samples)
                 for loss in self.losses
-            )
+            )  # type: ignore
 
         self.step += 1
         self.optimizer.zero_grad()
@@ -90,14 +89,14 @@ class DiscriminatorUpdater(ModuleUpdater):
             cache_method_call(self.module, 'score_word_vector'),
             cache_method_call(self.module, 'get_embedding'),
         ):
-            loss_collection = sum(
+            loss_collection: LossCollection = sum(
                 loss(
                     discriminator=self.module,
                     real_samples=real_samples,
                     fake_samples=fake_samples,
                 )
                 for loss in self.losses
-            )
+            )  # type: ignore
 
         self.step += 1
         self.optimizer.zero_grad()

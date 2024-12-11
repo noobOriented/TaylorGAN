@@ -1,47 +1,23 @@
-from itertools import chain
+import typing as t
 
+import more_itertools
 import torch
 
-from library.utils import ObjectWrapper, format_object, wraps_with_new_signature
+from library.utils import wraps_with_new_signature
 
 
-class OptimizerWrapper(ObjectWrapper):
+def add_custom_optimizer_args(optimizer_cls: type[torch.optim.Optimizer]) -> t.Callable[..., torch.optim.Optimizer]:
 
-    def __init__(self, optimizer: torch.optim.Optimizer, clip_norm: float = 0):
-        super().__init__(optimizer)
-        self.optimizer = optimizer
-        self.clip_norm = clip_norm
-
-    def step(self, closure=None):
-        torch.nn.utils.clip_grad_norm_(self.params, self.clip_norm)
-        self.optimizer.step(closure)
-
-    @property
-    def params(self):
-        return chain.from_iterable(
-            group['params']
-            for group in self.optimizer.param_groups
-        )
-
-    def __str__(self):
-        kwargs = {
-            key: val
-            for key, val in self.optimizer.param_groups[0].items()
-            if key != 'params'
-        }
-        if self.clip_norm:
-            kwargs['clip_norm'] = self.clip_norm
-
-        return format_object(self.optimizer, **kwargs)
-
-    @classmethod
-    def as_constructor(cls, optimizer_cls: type[torch.optim.Optimizer]):
-
-        @wraps_with_new_signature(optimizer_cls)
-        def wrapper(*args, clip_norm=0, **kwargs):
-            return cls(
-                optimizer=optimizer_cls(*args, **kwargs),
-                clip_norm=clip_norm,
+    @wraps_with_new_signature(optimizer_cls)
+    def factory(*args, clip_norm: float = 0, **kwargs):
+        optimizer = optimizer_cls(*args, **kwargs)
+        @optimizer.register_step_pre_hook
+        def _(*_):
+            params = more_itertools.flatten(
+                g['params'] for g in optimizer.param_groups
             )
+            torch.nn.utils.clip_grad_norm_(params, clip_norm)
 
-        return wrapper
+        return optimizer
+
+    return factory

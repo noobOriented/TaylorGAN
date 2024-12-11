@@ -19,7 +19,7 @@ from core.objectives.regularizers import (
 )
 from core.preprocess import PreprocessResult
 from core.train import DiscriminatorUpdater, GANTrainer, GeneratorUpdater, NonParametrizedTrainer
-from core.train.optimizer import OptimizerWrapper
+from core.train.optimizer import add_custom_optimizer_args
 from library.torch_zoo.nn import LambdaModule, activations
 from library.torch_zoo.nn.masking import (
     MaskAvgPool1d, MaskConv1d, MaskGlobalAvgPool1d, MaskSequential,
@@ -144,7 +144,7 @@ _G_REGS = LookUpCall({
     'entropy': LossScaler.as_constructor(EntropyRegularizer),
 })
 _OPTIMIZERS = LookUpCall({
-    key: ArgumentBinder(OptimizerWrapper.as_constructor(optim_cls), preserved=['params'])
+    key: ArgumentBinder(add_custom_optimizer_args(optim_cls), preserved=['params'])
     for key, optim_cls in [
         ('sgd', torch.optim.SGD),
         ('rmsprop', torch.optim.RMSprop),
