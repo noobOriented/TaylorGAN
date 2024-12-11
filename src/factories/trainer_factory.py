@@ -5,18 +5,17 @@ import typing as t
 
 import pydantic
 import torch
-from torch.nn import Embedding, Linear
 
 from core.GAN import (
     BCE, Discriminator, DiscriminatorUpdater, GANLossTuple, GANObjective, GANTrainer,
     GradientPenaltyRegularizer, GumbelSoftmaxEstimator, ReinforceEstimator,
     StraightThroughEstimator, TaylorEstimator, WordVectorRegularizer,
 )
-from core.models import Generator
-from core.objectives import MLEObjective
-from core.objectives.regularizers import (
-    EmbeddingRegularizer, EntropyRegularizer, Regularizer, SpectralRegularizer,
+from core.losses import (
+    EmbeddingRegularizer, EntropyRegularizer, Regularizer,
+    SpectralRegularizer, mean_negative_log_likelihood,
 )
+from core.models import Generator
 from core.preprocess import PreprocessResult
 from core.train import GeneratorUpdater, NonParametrizedTrainer
 from core.train.optimizer import add_custom_optimizer_args
@@ -33,7 +32,7 @@ class MLEObjectiveConfigs(pydantic.BaseModel):
     g_regularizers: list[str] = []
 
     def get_trainer(self, data: PreprocessResult, generator: Generator):
-        losses: dict[str, tuple[Regularizer, float]] = {'NLL': (MLEObjective(), 1)}
+        losses: dict[str, tuple[Regularizer, float]] = {'NLL': (mean_negative_log_likelihood, 1)}
         for s in self.g_regularizers:
             (reg, coeff), info = _G_REGS(s, return_info=True)
             losses[info.func_name] = (reg, coeff)
@@ -94,7 +93,7 @@ class GANObjectiveConfigs(pydantic.BaseModel):
     def _create_discriminator(self, data: PreprocessResult) -> Discriminator:
         print(f"Create discriminator: {self.discriminator}")
         network_func = _D_MODELS(self.discriminator)
-        embedder = Embedding.from_pretrained(
+        embedder = torch.nn.Embedding.from_pretrained(
             torch.from_numpy(data.embedding_matrix),
             freeze=self.d_fix_embeddings,
             padding_idx=data.special_tokens.PAD.idx,
@@ -128,7 +127,7 @@ def cnn(input_size, activation: activations.TYPE_HINT = 'relu'):
         MaskConv1d(1024, 1024, kernel_size=3, padding=1),
         ActivationLayer(),
         MaskGlobalAvgPool1d(),
-        Linear(1024, 1024),
+        torch.nn.Linear(1024, 1024),
         ActivationLayer(),
     )
 
@@ -136,7 +135,7 @@ def cnn(input_size, activation: activations.TYPE_HINT = 'relu'):
 def resnet(input_size, activation: activations.TYPE_HINT = 'relu'):
     ActivationLayer = activations.deserialize(activation)
     return MaskSequential(
-        Linear(input_size, 512),
+        torch.nn.Linear(input_size, 512),
         ActivationLayer(),
         LambdaModule(lambda x: torch.transpose(x, 1, 2)),
         ResBlock(512, kernel_size=3),
@@ -148,7 +147,7 @@ def resnet(input_size, activation: activations.TYPE_HINT = 'relu'):
         ResBlock(512, kernel_size=3),
         ActivationLayer(),
         MaskGlobalAvgPool1d(),
-        Linear(512, 512),
+        torch.nn.Linear(512, 512),
         ActivationLayer(),
     )
 

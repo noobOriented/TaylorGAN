@@ -9,6 +9,10 @@ from core.models.sequence_modeling import TokenSequence
 from library.torch_zoo.functions import masked_reduce
 
 
+def mean_negative_log_likelihood(generator: AutoRegressiveGenerator, real_samples: TokenSequence):
+    return generator.seq_neg_logprobs(real_samples.ids).mean()
+
+
 class Regularizer(t.Protocol):
 
     @abc.abstractmethod

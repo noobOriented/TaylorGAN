@@ -4,21 +4,21 @@ import abc
 import typing as t
 
 import torch
+import dataclasses
 
 from core.models.generators import Generator
-from core.models.sequence_modeling import SampledTokenSequence, TokenSequence
+from core.models.sequence_modeling import TokenSequence
 from library.torch_zoo.functions import gaussian, masked_reduce, pairwise_euclidean
 from library.utils import format_object
 
 from .discriminators import Discriminator
 
 
+@dataclasses.dataclass
 class GANObjective:
-
-    def __init__(self, discriminator: Discriminator, generator_loss, estimator: GANEstimator):
-        self.discriminator = discriminator
-        self.generator_loss = generator_loss
-        self.estimator = estimator
+    discriminator: Discriminator
+    generator_loss: t.Callable[[torch.Tensor], torch.Tensor]
+    estimator: GANEstimator
 
     def __call__(self, generator: Generator, real_samples: TokenSequence):
         fake_samples = generator.generate(real_samples.batch_size, real_samples.maxlen)
@@ -39,7 +39,7 @@ class GANEstimator(abc.ABC):
         self,
         fake_samples: TokenSequence,
         discriminator: Discriminator,
-        generator_loss: t.Callable,
+        generator_loss: t.Callable[[torch.Tensor], torch.Tensor],
     ) -> torch.Tensor:
         ...
 
@@ -81,18 +81,14 @@ class GumbelSoftmaxEstimator(GANEstimator):
             mask=fake_samples.mask,
         )
 
+
 class ReinforceEstimator(GANEstimator):
 
     def __init__(self, baseline_decay: float = 0.9):
         self.baseline_decay = baseline_decay
         self.baseline = None
 
-    def compute_loss(
-        self,
-        fake_samples: SampledTokenSequence,
-        discriminator: Discriminator,
-        generator_loss: t.Callable,
-    ):
+    def compute_loss(self, fake_samples, discriminator, generator_loss):
         score = discriminator.score_samples(fake_samples)
         adv_loss = generator_loss(score)
         reward = adv_loss.squeeze(axis=1)  # shape (N, )
@@ -119,12 +115,7 @@ class TaylorEstimator(GANEstimator):
         self.bandwidth = bandwidth
         self.baseline = None
 
-    def compute_loss(
-        self,
-        fake_samples: SampledTokenSequence,
-        discriminator: Discriminator,
-        generator_loss,
-    ):
+    def compute_loss(self, fake_samples, discriminator, generator_loss):
         fake_embeddings = discriminator.get_embedding(word_ids=fake_samples.ids)
         score = discriminator.score_word_vector(fake_embeddings, mask=fake_samples.mask)
         adv_loss = generator_loss(score)
@@ -179,12 +170,7 @@ class TaylorEstimator(GANEstimator):
 
 class StraightThroughEstimator(GANEstimator):
 
-    def compute_loss(
-        self,
-        fake_samples: SampledTokenSequence,
-        discriminator: Discriminator,
-        generator_loss: t.Callable,
-    ):
+    def compute_loss(self, fake_samples, discriminator, generator_loss):
         word_vecs = discriminator.get_embedding(word_ids=fake_samples.ids)
         score = discriminator.score_word_vector(word_vecs)
         adv_loss = generator_loss(score)
@@ -197,7 +183,8 @@ class StraightThroughEstimator(GANEstimator):
         # TODO observable adv=adv_loss.mean()
 
 
-def _compute_loss_of_probability(discriminator, generator_loss, probs, mask):
+def _compute_loss_of_probability(
+    discriminator: Discriminator, generator_loss, probs, mask):
     word_vecs = torch.tensordot(probs, discriminator.embedding_weight, dims=1)  # (N, T, E)
     score = discriminator.score_word_vector(word_vecs, mask)
     return generator_loss(score).mean()
@@ -210,7 +197,7 @@ def D_BCE(real_score, fake_score):
     return (loss_real + loss_fake).mean()
 
 
-def BCE(score, labels) -> torch.Tensor:
+def BCE(score: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
     return torch.nn.functional.binary_cross_entropy_with_logits(
         score,
         target=torch.full_like(score, labels),
