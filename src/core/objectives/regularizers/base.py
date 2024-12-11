@@ -1,7 +1,7 @@
 import abc
 import typing as t
 
-from library.utils import ObjectWrapper, format_object, wraps_with_new_signature
+from library.utils import format_object, wraps_with_new_signature
 
 from ..collections import LossCollection
 
@@ -13,10 +13,9 @@ class Regularizer(t.Protocol):
         ...
 
 
-class LossScaler(ObjectWrapper[Regularizer]):
+class LossScaler(Regularizer):
 
     def __init__(self, regularizer: Regularizer, coeff: float):
-        super().__init__(regularizer)
         self.regularizer = regularizer
         self.coeff = coeff
 

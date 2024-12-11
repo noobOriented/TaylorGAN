@@ -14,12 +14,11 @@ class LossCollection:
 
     def __add__(self, other) -> t.Self:
         if isinstance(other, LossCollection):
-            return LossCollection(
+            return self.__class__(
                 self.total + other.total,
                 **self.observables,
                 **other.observables,
             )
         if other == 0:
-            return LossCollection(self.total + 0, **self.observables)
-
-        raise TypeError
+            return self.__class__(self.total + 0, **self.observables)
+        return NotImplemented
