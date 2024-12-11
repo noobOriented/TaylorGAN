@@ -4,15 +4,6 @@ from functools import WRAPPER_ASSIGNMENTS, WRAPPER_UPDATES, update_wrapper
 from itertools import chain
 
 
-class ObjectWrapper:
-
-    def __init__(self, wrapped):
-        self._wrapped = wrapped
-
-    def __getattr__(self, name):
-        return getattr(self._wrapped, name)
-
-
 class ArgumentBinder[T]:
 
     def __init__(self, func: t.Callable[..., T], preserved=()):

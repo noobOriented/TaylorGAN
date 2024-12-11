@@ -5,27 +5,24 @@ import typing as t
 
 import pydantic
 import torch
-from torch.nn import Embedding, Linear
 
-from core.models import Discriminator, Generator
-from core.objectives import MLEObjective
-from core.objectives.GAN import (
-    BCE, GANLossTuple, GANObjective, GumbelSoftmaxEstimator,
-    ReinforceEstimator, StraightThroughEstimator, TaylorEstimator,
+from core.GAN import (
+    BCE, Discriminator, DiscriminatorUpdater, GANLossTuple, GANObjective, GANTrainer,
+    GradientPenaltyRegularizer, GumbelSoftmaxEstimator, ReinforceEstimator,
+    StraightThroughEstimator, TaylorEstimator, WordVectorRegularizer,
 )
-from core.objectives.regularizers import (
-    EmbeddingRegularizer, EntropyRegularizer, GradientPenaltyRegularizer,
-    LossScaler, SpectralRegularizer, WordVectorRegularizer,
-)
+from core.GAN.discriminators import DiscriminatorLoss, EmbeddingRegularizer, SpectralRegularizer
+from core.losses import EntropyRegularizer, GeneratorLoss, mean_negative_log_likelihood
+from core.models import Generator
 from core.preprocess import PreprocessResult
-from core.train import DiscriminatorUpdater, GANTrainer, GeneratorUpdater, NonParametrizedTrainer
-from core.train.optimizer import OptimizerWrapper
+from core.train import GeneratorUpdater, NonParametrizedTrainer
+from core.train.optimizer import add_custom_optimizer_args
 from library.torch_zoo.nn import LambdaModule, activations
 from library.torch_zoo.nn.masking import (
     MaskAvgPool1d, MaskConv1d, MaskGlobalAvgPool1d, MaskSequential,
 )
 from library.torch_zoo.nn.resnet import ResBlock
-from library.utils import ArgumentBinder, LookUpCall
+from library.utils import ArgumentBinder, LookUpCall, wraps_with_new_signature
 
 
 class MLEObjectiveConfigs(pydantic.BaseModel):
@@ -33,10 +30,15 @@ class MLEObjectiveConfigs(pydantic.BaseModel):
     g_regularizers: list[str] = []
 
     def get_trainer(self, data: PreprocessResult, generator: Generator):
+        losses: dict[str, tuple[GeneratorLoss, float]] = {'NLL': (mean_negative_log_likelihood, 1)}
+        for s in self.g_regularizers:
+            (reg, coeff), info = _G_REGS(s, return_info=True)
+            losses[info.func_name] = (reg, coeff)
+
         generator_updater = GeneratorUpdater(
             generator,
-            optimizer=_OPTIMIZERS(self.g_optimizer)(generator.trainable_variables),
-            losses=[MLEObjective()] + [_G_REGS(s) for s in self.g_regularizers],
+            optimizer=_OPTIMIZERS(self.g_optimizer)(generator.parameters()),
+            losses=losses,
         )
         return NonParametrizedTrainer(generator_updater)
 
@@ -61,17 +63,31 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             generator_loss=self._loss_tuple.generator_loss,
             estimator=_ESTIMATORS(self.estimator),
         )
+        g_losses: dict[str, tuple[GeneratorLoss, float]] = {
+            self.loss: (objective, 1),
+        }
+        for s in self.g_regularizers:
+            (reg, coeff), info = _G_REGS(s, return_info=True)
+            g_losses[info.func_name] = (reg, coeff)
+
+        d_losses: dict[str, tuple[DiscriminatorLoss, float]] = {
+            'BCE': (self._loss_tuple.discriminator_loss, 1),
+        }
+        for s in self.d_regularizers:
+            (reg, coeff), info = _D_REGS(s, return_info=True)
+            d_losses[info.func_name] = (reg, coeff)
+
         generator_updater = GeneratorUpdater(
             generator,
-            optimizer=_OPTIMIZERS(self.g_optimizer)(generator.trainable_variables),
-            losses=[objective] + [_G_REGS(s) for s in self.g_regularizers],
+            optimizer=_OPTIMIZERS(self.g_optimizer)(generator.parameters()),
+            losses=g_losses,
         )
         return GANTrainer(
             generator_updater=generator_updater,
             discriminator_updater=DiscriminatorUpdater(
                 discriminator,
-                optimizer=_OPTIMIZERS(self.d_optimizer)(discriminator.trainable_variables),
-                losses=[self._loss_tuple.discriminator_loss] + [_D_REGS(s) for s in self.d_regularizers],
+                optimizer=_OPTIMIZERS(self.d_optimizer)(discriminator.parameters()),
+                losses=d_losses,
             ),
             d_steps=self.d_steps,
         )
@@ -79,7 +95,7 @@ class GANObjectiveConfigs(pydantic.BaseModel):
     def _create_discriminator(self, data: PreprocessResult) -> Discriminator:
         print(f"Create discriminator: {self.discriminator}")
         network_func = _D_MODELS(self.discriminator)
-        embedder = Embedding.from_pretrained(
+        embedder = torch.nn.Embedding.from_pretrained(
             torch.from_numpy(data.embedding_matrix),
             freeze=self.d_fix_embeddings,
             padding_idx=data.special_tokens.PAD.idx,
@@ -113,7 +129,7 @@ def cnn(input_size, activation: activations.TYPE_HINT = 'relu'):
         MaskConv1d(1024, 1024, kernel_size=3, padding=1),
         ActivationLayer(),
         MaskGlobalAvgPool1d(),
-        Linear(1024, 1024),
+        torch.nn.Linear(1024, 1024),
         ActivationLayer(),
     )
 
@@ -121,7 +137,7 @@ def cnn(input_size, activation: activations.TYPE_HINT = 'relu'):
 def resnet(input_size, activation: activations.TYPE_HINT = 'relu'):
     ActivationLayer = activations.deserialize(activation)
     return MaskSequential(
-        Linear(input_size, 512),
+        torch.nn.Linear(input_size, 512),
         ActivationLayer(),
         LambdaModule(lambda x: torch.transpose(x, 1, 2)),
         ResBlock(512, kernel_size=3),
@@ -133,18 +149,27 @@ def resnet(input_size, activation: activations.TYPE_HINT = 'relu'):
         ResBlock(512, kernel_size=3),
         ActivationLayer(),
         MaskGlobalAvgPool1d(),
-        Linear(512, 512),
+        torch.nn.Linear(512, 512),
         ActivationLayer(),
     )
 
 
+def _concat_coeff[**P, T](
+    regularizer_cls: t.Callable[P, T],
+) -> t.Callable[t.Concatenate[float, P], tuple[T, float]]:
+
+    @wraps_with_new_signature(regularizer_cls)
+    def wrapper(coeff: float, *args: P.args, **kwargs: P.kwargs):
+        return regularizer_cls(*args, **kwargs), coeff
+
+    return wrapper
+
+
 _G_REGS = LookUpCall({
-    'spectral': LossScaler.as_constructor(SpectralRegularizer),
-    'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
-    'entropy': LossScaler.as_constructor(EntropyRegularizer),
+    'entropy': _concat_coeff(EntropyRegularizer),
 })
 _OPTIMIZERS = LookUpCall({
-    key: ArgumentBinder(OptimizerWrapper.as_constructor(optim_cls), preserved=['params'])
+    key: ArgumentBinder(add_custom_optimizer_args(optim_cls), preserved=['params'])
     for key, optim_cls in [
         ('sgd', torch.optim.SGD),
         ('rmsprop', torch.optim.RMSprop),
@@ -167,8 +192,8 @@ _ESTIMATORS = LookUpCall({
     'gumbel': GumbelSoftmaxEstimator,
 })
 _D_REGS = LookUpCall({
-    'spectral': LossScaler.as_constructor(SpectralRegularizer),
-    'embedding': LossScaler.as_constructor(EmbeddingRegularizer),
-    'grad_penalty': LossScaler.as_constructor(GradientPenaltyRegularizer),
-    'word_vec': LossScaler.as_constructor(WordVectorRegularizer),
+    'spectral': _concat_coeff(SpectralRegularizer),
+    'embedding': _concat_coeff(EmbeddingRegularizer),
+    'grad_penalty': _concat_coeff(GradientPenaltyRegularizer),
+    'word_vec': _concat_coeff(WordVectorRegularizer),
 })
