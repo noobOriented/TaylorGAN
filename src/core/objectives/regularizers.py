@@ -1,10 +1,30 @@
-from functools import lru_cache
+import abc
+import functools
+import typing as t
 
 import torch
 
-from core.models import ModuleInterface
+from core.models import AutoRegressiveGenerator
+from core.models.sequence_modeling import TokenSequence
+from library.torch_zoo.functions import masked_reduce
 
-from .base import Regularizer
+
+class Regularizer(t.Protocol):
+
+    @abc.abstractmethod
+    def __call__(self, **kwargs) -> torch.Tensor:
+        ...
+
+
+class EntropyRegularizer(Regularizer):
+
+    def __call__(self, generator: AutoRegressiveGenerator, real_samples: TokenSequence):
+        fake_samples = generator.generate(real_samples.batch_size, real_samples.maxlen)
+        # NOTE it's biased
+        logp = torch.nn.functional.log_softmax(fake_samples.logits, dim=-1)  # (N, T, V)
+        neg_entropy = (logp.detach() * fake_samples.probs).sum(dim=-1)  # (N, T)
+        # TODO observable: entropy=fake_samples.seq_neg_logprobs.mean()
+        return masked_reduce(neg_entropy, mask=fake_samples.mask)  # scalar
 
 
 class VariableRegularizer(Regularizer):
@@ -14,7 +34,7 @@ class VariableRegularizer(Regularizer):
             raise TypeError
         return self.compute_loss_of_module(module=generator or discriminator)
 
-    def compute_loss_of_module(self, module: ModuleInterface) -> torch.Tensor:
+    def compute_loss_of_module(self, module) -> torch.Tensor:
         ...
 
 
@@ -23,8 +43,12 @@ class EmbeddingRegularizer(VariableRegularizer):
     def __init__(self, max_norm: float = 0.):
         self.max_norm = max_norm
 
-    def compute_loss_of_module(self, module: ModuleInterface):
-        embedding_L2_loss = torch.square(module.embedding_matrix).sum(dim=1)  # shape (V, )
+    def compute_loss_of_module(self, module):
+        weight: torch.nn.Parameter = module.embedding_weight
+        if not weight.requires_grad:
+            raise RuntimeError
+
+        embedding_L2_loss = torch.square(module.embedding_weight).sum(dim=1)  # shape (V, )
         if self.max_norm:
             embedding_L2_loss = (embedding_L2_loss - self.max_norm ** 2).clamp(min=0.)
         return embedding_L2_loss.mean() / 2  # shape ()
@@ -32,7 +56,7 @@ class EmbeddingRegularizer(VariableRegularizer):
 
 class SpectralRegularizer(VariableRegularizer):
 
-    def compute_loss_of_module(self, module: ModuleInterface):
+    def compute_loss_of_module(self, module: torch.nn.Module):
         loss = 0
         for module in module.modules():
             weight = getattr(module, 'weight', None)
@@ -45,7 +69,7 @@ class SpectralRegularizer(VariableRegularizer):
         return loss
 
     def _get_spectral_norm(self, weight: torch.nn.Parameter):
-        u = get_u(weight)  # shape (U)
+        u = _get_u(weight)  # shape (U)
         if weight.ndim > 2:
             weight_matrix = weight.view(weight.shape[0], -1)
         else:
@@ -58,6 +82,6 @@ class SpectralRegularizer(VariableRegularizer):
         return spectral_norm, u, new_u
 
 
-@lru_cache(None)
-def get_u(kernel):
+@functools.cache
+def _get_u(kernel):
     return kernel.new_empty(kernel.shape[0]).normal_().detach()

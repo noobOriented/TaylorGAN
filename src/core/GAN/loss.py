@@ -133,12 +133,12 @@ class TaylorEstimator(GANEstimator):
         first_order_reward = self.taylor_first_order(
             y=reward,
             x0=fake_embeddings,
-            xs=discriminator.embedding_matrix,
+            xs=discriminator.embedding_weight,
         ).view_as(fake_samples.logits)
         zeroth_order_advantage = self.compute_advantage(reward)
         advantage = zeroth_order_advantage.unsqueeze(dim=2) + first_order_reward
 
-        square_dist = pairwise_euclidean(discriminator.embedding_matrix)
+        square_dist = pairwise_euclidean(discriminator.embedding_weight)
         kernel = gaussian(square_dist / (self.bandwidth ** 2))  # (V, V)
         batch_kernel = torch.nn.functional.embedding(fake_samples.ids, kernel)  # shape (N, T, V)
         likelihood = torch.tensordot(fake_samples.probs, kernel, dims=1)
@@ -191,14 +191,14 @@ class StraightThroughEstimator(GANEstimator):
 
         d_word_vecs, = torch.autograd.grad(adv_loss, word_vecs)  # (N, T, E)
         # NOTE, can be derived by chain-rule
-        d_onehot = torch.tensordot(d_word_vecs, discriminator.embedding_matrix, dims=[[-1], [-1]])
+        d_onehot = torch.tensordot(d_word_vecs, discriminator.embedding_weight, dims=[[-1], [-1]])
         full_loss = d_onehot.detach() * fake_samples.probs  # (N, T, V)
         return masked_reduce(full_loss, mask=fake_samples.mask)
         # TODO observable adv=adv_loss.mean()
 
 
 def _compute_loss_of_probability(discriminator, generator_loss, probs, mask):
-    word_vecs = torch.tensordot(probs, discriminator.embedding_matrix, dims=1)  # (N, T, E)
+    word_vecs = torch.tensordot(probs, discriminator.embedding_weight, dims=1)  # (N, T, E)
     score = discriminator.score_word_vector(word_vecs, mask)
     return generator_loss(score).mean()
 

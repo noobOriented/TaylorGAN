@@ -6,15 +6,14 @@ import torch
 from core.preprocess import SpecialToken
 from library.torch_zoo.functions import random_choice_by_logits
 
-from .interfaces import ModuleInterface
 from .sequence_modeling import SampledTokenSequence, TokenSequence
 
 
-class Generator(torch.nn.Module, ModuleInterface):
+class Generator(torch.nn.Module):
 
     scope = 'Generator'
 
-    def __init__(self, embedder: torch.nn.Module, special_tokens: type[SpecialToken]):
+    def __init__(self, embedder: torch.nn.Embedding, special_tokens: type[SpecialToken]):
         super().__init__()
         self.embedder = embedder
         self.special_tokens = special_tokens
@@ -24,7 +23,7 @@ class Generator(torch.nn.Module, ModuleInterface):
         ...
 
     @property
-    def embedding_matrix(self):
+    def embedding_weight(self):
         return self.embedder.weight
 
 

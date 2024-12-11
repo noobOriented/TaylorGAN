@@ -2,11 +2,10 @@ import typing as t
 
 import torch
 
-from core.models.interfaces import ModuleInterface
 from core.models.sequence_modeling import TokenSequence
 
 
-class Discriminator(torch.nn.Module, ModuleInterface):
+class Discriminator(torch.nn.Module):
 
     scope = 'Discriminator'
 
@@ -33,11 +32,7 @@ class Discriminator(torch.nn.Module, ModuleInterface):
         return self.binary_output_layer(features)
 
     @property
-    def networks(self) -> list[torch.nn.Module]:
-        return [self.embedder, self.network, self.binary_output_layer]
-
-    @property
-    def embedding_matrix(self):
+    def embedding_weight(self):
         return self.embedder.weight
 
 

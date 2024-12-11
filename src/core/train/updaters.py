@@ -1,8 +1,8 @@
 import abc
 import typing as t
 
+import more_itertools
 import torch
-from more_itertools import first
 
 from core.models.generators import Generator
 from core.models.sequence_modeling import TokenSequence
@@ -33,6 +33,11 @@ class ModuleUpdater[T: torch.nn.Module]:
             for k in losses.keys()
         }
 
+        @self.optimizer.register_step_post_hook
+        def call_hook(*_):
+            self.step_hook(self.step)
+            self.step += 1
+
     @abc.abstractmethod
     def compute_loss(self, *args, **kwargs) -> dict[str, torch.Tensor]:
         ...
@@ -42,12 +47,10 @@ class ModuleUpdater[T: torch.nn.Module]:
         for k, v in losses.items():
             self.loss_hooks[k](self.step, v.detach().numpy())
 
-        self.step_hook(self.step)
         self.optimizer.zero_grad()
         sum_loss: torch.Tensor = sum(self.losses[k][1] * v for k, v in losses.items())
         sum_loss.backward()
         self.optimizer.step()
-        self.step += 1
 
     def state_dict(self) -> dict:
         return {
@@ -58,27 +61,21 @@ class ModuleUpdater[T: torch.nn.Module]:
     def load_state_dict(self, state_dict: dict):
         self.module.load_state_dict(state_dict['module'])
         self.optimizer.load_state_dict(state_dict['optimizer'])
-        if state_dict['optimizer']['state']:
-            self.step = first(state_dict['optimizer']['state'].values())['step']
-
-    @property
-    def info(self):
-        return f"{self.module.scope[0]} {str(self.module).splitlines()[0]}"  # FIXME
+        if op_state := state_dict['optimizer']['state']:
+            self.step = more_itertools.first(op_state.values())['step']
 
     def summary(self):
+        trainable_params = sum(p.numel() for p in self.module.parameters() if p.requires_grad)
+        fixed_params = sum(p.numel() for p in self.module.parameters() if not p.requires_grad)
         with logging_indent(self.module.scope):
             with logging_indent("Model"):
-                print(f'Trainable     params: {_count_numel(self.module.trainable_variables):>12}')
-                print(f'Non-trainable params: {_count_numel(self.module.non_trainable_variables):>12,}')
+                print(f'Trainable     params: {trainable_params:>12}')
+                print(f'Non-trainable params: {fixed_params:>12,}')
 
             print(f'Optimizer: {self.optimizer}')
             with logging_indent("Objective:"):
                 for loss in self.losses:
                     print(loss)
-
-
-def _count_numel(params) -> int:
-    return sum(p.numel() for p in params)
 
 
 class GeneratorUpdater(ModuleUpdater[Generator]):

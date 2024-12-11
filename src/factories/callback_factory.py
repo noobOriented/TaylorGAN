@@ -297,7 +297,13 @@ class _CallbackCreator:
                 def _(step, loss: float, progress=progress, task_id=task_id, ema=ema):
                     progress.update(task_id, value=ema(loss))
 
-            yield rich.panel.Panel(progress, border_style='blue', title=updater.module.scope, padding=(0, 2))
+            yield rich.panel.Panel(
+                progress,
+                title=updater.module.scope,
+                border_style='blue',
+                padding=(0, 2),
+                expand=True,
+            )
 
     def _create_metric_panel(self):
         progress = rich.progress.Progress('[cyan]{task.description}', '{task.fields[value]}')
