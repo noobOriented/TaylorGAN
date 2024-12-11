@@ -7,18 +7,18 @@ import pydantic
 import torch
 from torch.nn import Embedding, Linear
 
-from core.models import Discriminator, Generator
-from core.objectives import MLEObjective
-from core.objectives.GAN import (
-    BCE, GANLossTuple, GANObjective, GumbelSoftmaxEstimator,
-    ReinforceEstimator, StraightThroughEstimator, TaylorEstimator,
+from core.GAN import (
+    BCE, Discriminator, DiscriminatorUpdater, GANLossTuple, GANObjective, GANTrainer,
+    GradientPenaltyRegularizer, GumbelSoftmaxEstimator, ReinforceEstimator,
+    StraightThroughEstimator, TaylorEstimator, WordVectorRegularizer,
 )
+from core.models import Generator
+from core.objectives import MLEObjective
 from core.objectives.regularizers import (
-    EmbeddingRegularizer, EntropyRegularizer, GradientPenaltyRegularizer,
-    LossScaler, SpectralRegularizer, WordVectorRegularizer,
+    EmbeddingRegularizer, EntropyRegularizer, LossScaler, SpectralRegularizer,
 )
 from core.preprocess import PreprocessResult
-from core.train import DiscriminatorUpdater, GANTrainer, GeneratorUpdater, NonParametrizedTrainer
+from core.train import GeneratorUpdater, NonParametrizedTrainer
 from core.train.optimizer import add_custom_optimizer_args
 from library.torch_zoo.nn import LambdaModule, activations
 from library.torch_zoo.nn.masking import (

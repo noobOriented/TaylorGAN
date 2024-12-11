@@ -79,31 +79,3 @@ class GeneratorUpdater(ModuleUpdater):
         }
         self.hook(self.step, losses)
         self.optimizer.step()
-
-
-class DiscriminatorUpdater(ModuleUpdater):
-
-    def update_step(self, real_samples, fake_samples):
-        with (
-            cache_method_call(self.module, 'score_samples'),
-            cache_method_call(self.module, 'score_word_vector'),
-            cache_method_call(self.module, 'get_embedding'),
-        ):
-            loss_collection: LossCollection = sum(
-                loss(
-                    discriminator=self.module,
-                    real_samples=real_samples,
-                    fake_samples=fake_samples,
-                )
-                for loss in self.losses
-            )  # type: ignore
-
-        self.step += 1
-        self.optimizer.zero_grad()
-        loss_collection.total.backward()
-        losses = {
-            key: tensor.detach().numpy()
-            for key, tensor in loss_collection.observables.items()
-        }
-        self.hook(self.step, losses)
-        self.optimizer.step()

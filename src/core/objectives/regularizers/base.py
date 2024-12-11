@@ -20,8 +20,8 @@ class LossScaler(ObjectWrapper[Regularizer]):
         self.regularizer = regularizer
         self.coeff = coeff
 
-    def __call__(self, **kwargs) -> LossCollection:
-        loss = self.regularizer(**kwargs)
+    def __call__(self, *args, **kwargs) -> LossCollection:
+        loss = self.regularizer(*args, **kwargs)
         return LossCollection(self.coeff * loss.total, **loss.observables)
 
     @classmethod

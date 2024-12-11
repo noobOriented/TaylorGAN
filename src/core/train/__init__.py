@@ -1,4 +1,4 @@
 from .fit_loop import Callback, DataLoader
 from .pubsub import EventHook
-from .trainers import GANTrainer, ModelCheckpointSaver, NonParametrizedTrainer, Trainer
-from .updaters import DiscriminatorUpdater, GeneratorUpdater, ModuleUpdater
+from .trainers import ModelCheckpointSaver, NonParametrizedTrainer, Trainer
+from .updaters import GeneratorUpdater, ModuleUpdater

@@ -1,3 +1,3 @@
-from .base import LossScaler
-from .regularizers import EntropyRegularizer, GradientPenaltyRegularizer, WordVectorRegularizer
+from .base import LossScaler, Regularizer
+from .regularizers import EntropyRegularizer
 from .variable_regularizers import EmbeddingRegularizer, SpectralRegularizer
