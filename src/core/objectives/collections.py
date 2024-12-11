@@ -1,9 +1,11 @@
 import typing as t
 
+import torch
+
 
 class LossCollection:
 
-    def __init__(self, total, **observables):
+    def __init__(self, total: torch.Tensor, **observables):
         self.total = total
         self.observables = observables
 

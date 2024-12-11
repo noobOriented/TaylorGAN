@@ -8,11 +8,16 @@ from .base import LossCollection, Regularizer
 
 
 class VariableRegularizer(Regularizer):
+    loss_name: str
 
     def __call__(self, generator=None, discriminator=None, **kwargs) -> LossCollection:
         if generator and discriminator:
             raise TypeError
-        return self.compute_loss(module=generator or discriminator)
+        loss = self.compute_loss_of_module(module=generator or discriminator)
+        return LossCollection(loss, **{self.loss_name: loss})
+
+    def compute_loss_of_module(self, module: ModuleInterface) -> torch.Tensor:
+        ...
 
 
 class EmbeddingRegularizer(VariableRegularizer):
@@ -22,7 +27,7 @@ class EmbeddingRegularizer(VariableRegularizer):
     def __init__(self, max_norm: float = 0.):
         self.max_norm = max_norm
 
-    def compute_loss(self, module: ModuleInterface):
+    def compute_loss_of_module(self, module: ModuleInterface):
         embedding_L2_loss = torch.square(module.embedding_matrix).sum(dim=1)  # shape (V, )
         if self.max_norm:
             embedding_L2_loss = (embedding_L2_loss - self.max_norm ** 2).clamp(min=0.)
@@ -33,7 +38,7 @@ class SpectralRegularizer(VariableRegularizer):
 
     loss_name = 'spectral'
 
-    def compute_loss(self, module: ModuleInterface):
+    def compute_loss_of_module(self, module: ModuleInterface):
         loss = 0
         for module in module.modules():
             weight = getattr(module, 'weight', None)

@@ -4,9 +4,9 @@ from functools import WRAPPER_ASSIGNMENTS, WRAPPER_UPDATES, update_wrapper
 from itertools import chain
 
 
-class ObjectWrapper:
+class ObjectWrapper[T]:
 
-    def __init__(self, wrapped):
+    def __init__(self, wrapped: T):
         self._wrapped = wrapped
 
     def __getattr__(self, name):
