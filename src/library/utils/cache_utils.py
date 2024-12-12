@@ -70,7 +70,7 @@ class NumpyCache(FileCache):
         np.savez_compressed(path, data=data)
 
 
-def cache_method_call(obj, method: str):
+def cache_method_call(obj: t.Any, method: str):
     old_method = getattr(obj, method)
     new_method = functools.cache(old_method)
     return patch.object(obj, method, new_method)

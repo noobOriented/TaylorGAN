@@ -24,9 +24,6 @@ class GANTrainer(Trainer):
     ):
         super().__init__(generator_updater)
 
-        self.generator = generator_updater.module
-        self.generator_losses = generator_updater.losses
-
         self.discriminator_updater = discriminator_updater
         self.discriminator = discriminator_updater.module
         self.discriminator_losses = discriminator_updater.losses
@@ -38,11 +35,17 @@ class GANTrainer(Trainer):
                 torch.from_numpy(batch_data).type(torch.long),
                 eos_idx=self.generator_updater.module.special_tokens.EOS.idx,
             )
-            sum_loss = self._compute_discriminator_loss(real_samples)
-            self.discriminator_updater.update_step(sum_loss)
-            if self.discriminator_updater.step % self.d_steps == 0:
-                sum_loss = self._compute_generator_loss(real_samples)
-                self.generator_updater.update_step(sum_loss)
+            with (
+                cache_method_call(self.generator, 'generate'),
+                cache_method_call(self.discriminator, 'score_samples'),
+                cache_method_call(self.discriminator, 'score_word_vector'),
+                cache_method_call(self.discriminator, 'get_embedding'),
+            ):
+                sum_loss = self._compute_discriminator_loss(real_samples)
+                self.discriminator_updater.update_step(sum_loss)
+                if self.discriminator_updater.step % self.d_steps == 0:
+                    sum_loss = self._compute_generator_loss(real_samples)
+                    self.generator_updater.update_step(sum_loss)
 
     @property
     def updaters(self):
@@ -50,14 +53,14 @@ class GANTrainer(Trainer):
 
     def _compute_discriminator_loss(self, real_samples: TokenSequence) -> torch.Tensor:
         fake_samples = self.generator.generate(real_samples.batch_size, real_samples.maxlen)
-        with (
-            cache_method_call(self.discriminator, 'score_samples'),
-            cache_method_call(self.discriminator, 'score_word_vector'),
-            cache_method_call(self.discriminator, 'get_embedding'),
-        ):
-            d_losses = {
-                name: loss(self.discriminator, real_samples=real_samples, fake_samples=fake_samples)
-                for name, (loss, _) in self.discriminator_losses.items()
-            }
+        losses = {
+            name: loss(self.discriminator, real_samples, fake_samples)
+            for name, (loss, _) in self.discriminator_losses.items()
+        }
+        for name, loss_val in losses.items():
+            self.discriminator_updater.loss_update_events[name](
+                self.discriminator_updater.step,
+                loss_val.detach().numpy(),
+            )
 
-        return sum(self.discriminator_losses[k][1] * v for k, v in d_losses.items())  # type: ignore
+        return sum(self.discriminator_losses[k][1] * v for k, v in losses.items())  # type: ignore

@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing as t
 
 
-class Event[*T]:
+class ListenableEvent[*T]:
 
     def __init__(self) -> None:
         self._hooks: list[t.Callable[[*T], t.Any]] = []

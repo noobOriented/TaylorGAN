@@ -21,7 +21,7 @@ import torch
 from core.evaluate import TextGenerator
 from core.models.generators import Generator
 from core.preprocess import PreprocessResult
-from core.train import Callback, Event, ModelCheckpointSaver, Trainer
+from core.train import Callback, ListenableEvent, ModelCheckpointSaver, Trainer
 from library.utils import (
     SEPARATION_LINE, ExponentialMovingAverageMeter, get_seqlens, logging_indent, random_sample,
 )
@@ -94,7 +94,7 @@ class _CallbackCreator:
             self.base_tag or f"{self.data.cache_key}@{time.strftime('%Y%m%d-%H%M%S')}",
         ])
         self.text_generator = TextGenerator(self.generator, tokenizer=self.data.tokenizer)
-        self.metric_update_events = collections.defaultdict[str, Event[int, t.Any]](Event)
+        self.metric_update_events = collections.defaultdict[str, ListenableEvent[int, t.Any]](ListenableEvent)
 
     def attach_events(self):
         self._attach_evaluators()

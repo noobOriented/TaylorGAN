@@ -5,7 +5,7 @@ import typing as t
 import more_itertools
 import numpy.typing as npt
 
-from core.train.pubsub import Event
+from core.train.pubsub import ListenableEvent
 from library.utils import batch_generator
 
 
@@ -53,12 +53,12 @@ class DataLoader:
 
 class Callback:
     def __init__(self) -> None:
-        self.on_train_begin = Event[()]()
-        self.on_epoch_begin = Event[int]()
-        self.on_batch_begin = Event[int]()
-        self.on_batch_end = Event[int, npt.NDArray]()
-        self.on_epoch_end = Event[int]()
-        self.on_train_end = Event[()]()
+        self.on_train_begin = ListenableEvent[()]()
+        self.on_epoch_begin = ListenableEvent[int]()
+        self.on_batch_begin = ListenableEvent[int]()
+        self.on_batch_end = ListenableEvent[int, npt.NDArray]()
+        self.on_epoch_end = ListenableEvent[int]()
+        self.on_train_end = ListenableEvent[()]()
 
     def summary(self):
         # TODO list all hooks and their period

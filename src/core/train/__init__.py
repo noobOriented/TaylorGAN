@@ -1,4 +1,3 @@
 from .fit_loop import Callback, DataLoader
-from .pubsub import Event
-from .trainers import ModelCheckpointSaver, NonParametrizedTrainer, Trainer
-from .updaters import ModuleUpdater
+from .pubsub import ListenableEvent
+from .trainers import ModelCheckpointSaver, NonParametrizedTrainer, Trainer, ModuleUpdater
