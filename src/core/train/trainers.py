@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 from core.models.sequence_modeling import TokenSequence
-from library.utils import logging_indent
+from library.utils import cache_method_call, logging_indent
 
 from .updaters import GeneratorUpdater, ModuleUpdater
 
@@ -16,6 +16,8 @@ class Trainer(abc.ABC):
 
     def __init__(self, generator_updater: GeneratorUpdater):
         self.generator_updater = generator_updater
+        self.generator = generator_updater.module
+        self.generator_losses = generator_updater.losses
 
     @abc.abstractmethod
     def fit(self, data_loader: t.Iterable[np.ndarray], /):
@@ -48,6 +50,15 @@ class Trainer(abc.ABC):
                     for loss in updater.losses:
                         print(loss)
 
+    def _compute_generator_loss(self, real_samples) -> torch.Tensor:
+        with cache_method_call(self.generator, 'generate'):
+            g_losses = {
+                name: loss(self.generator, real_samples)
+                for name, (loss, _) in self.generator_losses.items()
+            }
+
+        return sum(self.generator_losses[k][1] * v for k, v in g_losses.items())  # type: ignore
+
 
 class NonParametrizedTrainer(Trainer):
 
@@ -57,7 +68,8 @@ class NonParametrizedTrainer(Trainer):
                 torch.from_numpy(batch_data).type(torch.long),
                 eos_idx=self.generator_updater.module.special_tokens.EOS.idx,
             )
-            self.generator_updater.update_step(real_samples)
+            g_loss = self._compute_generator_loss(real_samples)
+            self.generator_updater.update_step(g_loss)
 
 
 class ModelCheckpointSaver:
