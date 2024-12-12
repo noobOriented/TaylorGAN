@@ -6,15 +6,16 @@ import typing as t
 import numpy as np
 import torch
 
+from core.models import Generator
 from core.models.sequence_modeling import TokenSequence
 from library.utils import cache_method_call, logging_indent
 
-from .updaters import GeneratorUpdater, ModuleUpdater
+from .updaters import ModuleUpdater
 
 
 class Trainer(abc.ABC):
 
-    def __init__(self, generator_updater: GeneratorUpdater):
+    def __init__(self, generator_updater: ModuleUpdater[Generator]):
         self.generator_updater = generator_updater
         self.generator = generator_updater.module
         self.generator_losses = generator_updater.losses

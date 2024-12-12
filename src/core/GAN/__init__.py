@@ -3,4 +3,4 @@ from .loss import (
     BCE, GANLossTuple, GANObjective, GumbelSoftmaxEstimator, ReinforceEstimator,
     SoftmaxEstimator, StraightThroughEstimator, TaylorEstimator,
 )
-from .trainer import DiscriminatorUpdater, GANTrainer
+from .trainer import GANTrainer

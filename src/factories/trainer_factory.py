@@ -7,7 +7,7 @@ import pydantic
 import torch
 
 from core.GAN import (
-    BCE, Discriminator, DiscriminatorUpdater, GANLossTuple, GANObjective, GANTrainer,
+    BCE, Discriminator, GANLossTuple, GANObjective, GANTrainer,
     GradientPenaltyRegularizer, GumbelSoftmaxEstimator, ReinforceEstimator,
     StraightThroughEstimator, TaylorEstimator, WordVectorRegularizer,
 )
@@ -15,7 +15,7 @@ from core.GAN.discriminators import DiscriminatorLoss, EmbeddingRegularizer, Spe
 from core.losses import EntropyRegularizer, GeneratorLoss, mean_negative_log_likelihood
 from core.models import Generator
 from core.preprocess import PreprocessResult
-from core.train import GeneratorUpdater, NonParametrizedTrainer
+from core.train import ModuleUpdater, NonParametrizedTrainer
 from core.train.optimizer import add_custom_optimizer_args
 from library.torch_zoo.nn import LambdaModule, activations
 from library.torch_zoo.nn.masking import (
@@ -35,7 +35,7 @@ class MLEObjectiveConfigs(pydantic.BaseModel):
             (reg, coeff), info = _G_REGS(s, return_info=True)
             losses[info.func_name] = (reg, coeff)
 
-        generator_updater = GeneratorUpdater(
+        generator_updater = ModuleUpdater(
             generator,
             optimizer=_OPTIMIZERS(self.g_optimizer)(generator.parameters()),
             losses=losses,
@@ -77,14 +77,13 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             (reg, coeff), info = _D_REGS(s, return_info=True)
             d_losses[info.func_name] = (reg, coeff)
 
-        generator_updater = GeneratorUpdater(
-            generator,
-            optimizer=_OPTIMIZERS(self.g_optimizer)(generator.parameters()),
-            losses=g_losses,
-        )
         return GANTrainer(
-            generator_updater=generator_updater,
-            discriminator_updater=DiscriminatorUpdater(
+            generator_updater=ModuleUpdater(
+                generator,
+                optimizer=_OPTIMIZERS(self.g_optimizer)(generator.parameters()),
+                losses=g_losses,
+            ),
+            discriminator_updater=ModuleUpdater(
                 discriminator,
                 optimizer=_OPTIMIZERS(self.d_optimizer)(discriminator.parameters()),
                 losses=d_losses,

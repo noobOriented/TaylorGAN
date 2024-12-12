@@ -3,8 +3,6 @@ import typing as t
 import more_itertools
 import torch
 
-from core.models.generators import Generator
-
 from .pubsub import Event
 
 
@@ -48,7 +46,3 @@ class ModuleUpdater[T: torch.nn.Module]:
         self.optimizer.load_state_dict(state_dict['optimizer'])
         if op_state := state_dict['optimizer']['state']:
             self.step = more_itertools.first(op_state.values())['step']
-
-
-class GeneratorUpdater(ModuleUpdater[Generator]):
-    pass

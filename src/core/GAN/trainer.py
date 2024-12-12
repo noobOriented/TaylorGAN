@@ -6,8 +6,9 @@ import typing as t
 import numpy as np
 import torch
 
+from core.models import Generator
 from core.models.sequence_modeling import TokenSequence
-from core.train import GeneratorUpdater, ModuleUpdater, Trainer
+from core.train import ModuleUpdater, Trainer
 from library.utils import cache_method_call
 
 from .discriminators import Discriminator
@@ -17,8 +18,8 @@ class GANTrainer(Trainer):
 
     def __init__(
         self,
-        generator_updater: GeneratorUpdater,
-        discriminator_updater: DiscriminatorUpdater,
+        generator_updater: ModuleUpdater[Generator],
+        discriminator_updater: ModuleUpdater[Discriminator],
         d_steps: int = 1,
     ):
         super().__init__(generator_updater)
@@ -60,7 +61,3 @@ class GANTrainer(Trainer):
             }
 
         return sum(self.discriminator_losses[k][1] * v for k, v in d_losses.items())  # type: ignore
-
-
-class DiscriminatorUpdater(ModuleUpdater[Discriminator]):
-    pass
