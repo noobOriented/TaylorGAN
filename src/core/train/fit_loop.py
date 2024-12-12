@@ -5,7 +5,7 @@ import typing as t
 import more_itertools
 import numpy.typing as npt
 
-from core.train.pubsub import EventHook
+from core.train.pubsub import Event
 from library.utils import batch_generator
 
 
@@ -53,12 +53,12 @@ class DataLoader:
 
 class Callback:
     def __init__(self) -> None:
-        self.on_train_begin = EventHook[()]()
-        self.on_epoch_begin = EventHook[int]()
-        self.on_batch_begin = EventHook[int]()
-        self.on_batch_end = EventHook[int, npt.NDArray]()
-        self.on_epoch_end = EventHook[int]()
-        self.on_train_end = EventHook[()]()
+        self.on_train_begin = Event[()]()
+        self.on_epoch_begin = Event[int]()
+        self.on_batch_begin = Event[int]()
+        self.on_batch_end = Event[int, npt.NDArray]()
+        self.on_epoch_end = Event[int]()
+        self.on_train_end = Event[()]()
 
     def summary(self):
         # TODO list all hooks and their period
