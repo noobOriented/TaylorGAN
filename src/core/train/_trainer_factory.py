@@ -12,12 +12,12 @@ from ._loss import EntropyRegularizer, GeneratorLoss, mean_negative_log_likeliho
 from ._trainer import GeneratorTrainer
 
 
-class MLEObjectiveConfigs(pydantic.BaseModel):
+class TrainerConfigs(pydantic.BaseModel):
     g_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
     g_regularizers: list[str] = []
 
     def get_trainer(self, data: PreprocessResult, generator: Generator):
-        losses: dict[str, tuple[GeneratorLoss, float]] = {'NLL': (mean_negative_log_likelihood, 1)}
+        losses: dict[str, tuple[GeneratorLoss, float]] = {}
         for s in self.g_regularizers:
             (reg, coeff), info = _G_REGS(s, return_info=True)
             losses[info.func_name] = (reg, coeff)
@@ -59,6 +59,7 @@ def _add_custom_optimizer_args(optimizer_cls: type[torch.optim.Optimizer]) -> t.
 
 _G_REGS = LookUpCall({
     'entropy': _concat_coeff(EntropyRegularizer),
+    'NLL': lambda coeff: (mean_negative_log_likelihood, coeff),
 })
 _OPTIMIZERS = LookUpCall({
     key: ArgumentBinder(_add_custom_optimizer_args(optim_cls), preserved=['params'])

@@ -32,7 +32,7 @@ tensorflow = ["tensorflow", "tensorflow-hub"]
 
 [tool.poetry.scripts]
 GAN = "core.GAN.__main__:main"
-MLE = "core.train.__main__:MLE_main"
+MLE = "core.MLE:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

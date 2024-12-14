@@ -10,25 +10,18 @@ import torch
 
 from core.models import GeneratorConfigs
 from core.preprocess import DataConfigs
+from core.train import CallbackConfigs, DataLoader, ModelCheckpointSaver, TrainerConfigs
 from library.utils import format_highlight, logging_indent, parse_args_as
-
-from ._callback_factory import CallbackConfigs
-from ._fit_loop import DataLoader
-from ._loss import GeneratorLoss, mean_negative_log_likelihood
-from ._trainer import GeneratorTrainer, ModelCheckpointSaver
-from ._trainer_factory import _G_REGS, _OPTIMIZERS, MLEObjectiveConfigs
-
-
-def MLE_main():
-    configs = parse_args_as(MLEConfigs)
-    main(configs)
 
 
 def main(
-    configs: CommonTrainingConfigs,
+    configs: MainConfigs | None = None,
     base_tag: str | None = None,
     checkpoint: str | os.PathLike[str] | None = None,
 ):
+    if configs is None:
+        configs = parse_args_as(MainConfigs)
+
     with logging_indent("Set global random seed"):
         _set_global_random_seed(configs.random_seed)
 
@@ -76,22 +69,11 @@ def _set_global_random_seed(seed: int | None):
         torch.manual_seed(seed)
 
 
-class CommonTrainingConfigs(CallbackConfigs, DataConfigs, GeneratorConfigs):
+class MainConfigs(TrainerConfigs, CallbackConfigs, DataConfigs, GeneratorConfigs):
     epochs: t.Annotated[int, pydantic.Field(ge=1, description='number of training epochs.')] = 10_000
     batch_size: t.Annotated[int, pydantic.Field(ge=1, description='size of data mini-batch.')] = 64
     random_seed: t.Annotated[int | None, pydantic.Field(description='the global random seed.')] = None
 
 
-class MLEConfigs(CommonTrainingConfigs, MLEObjectiveConfigs, extra='forbid'):
-
-    def get_trainer(self, data, generator):
-        losses: dict[str, tuple[GeneratorLoss, float]] = {'NLL': (mean_negative_log_likelihood, 1)}
-        for s in self.g_regularizers:
-            (reg, coeff), info = _G_REGS(s, return_info=True)
-            losses[info.func_name] = (reg, coeff)
-
-        return GeneratorTrainer(
-            generator,
-            optimizer=_OPTIMIZERS(self.g_optimizer)(generator.parameters()),
-            losses=losses,
-        )
+if __name__ == '__main__':
+    main()

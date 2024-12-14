@@ -3,10 +3,9 @@ import pathlib
 
 import pydantic
 
-from core.GAN.__main__ import GANTrainingConfigs
+import core.main
+from core.GAN import GANMainConfigs
 from core.train import ModelCheckpointSaver
-from core.train.__main__ import MLEConfigs
-from core.train.__main__ import main as train_main
 
 
 def main():
@@ -45,13 +44,13 @@ def main():
     try:
         with open(main_args_path, 'r') as f_in:
             main_args = pydantic.RootModel[
-                GANTrainingConfigs | MLEConfigs,
+                GANMainConfigs | core.main.MainConfigs,
             ].model_validate_json(f_in.read()).root
     except FileNotFoundError:
         raise FileNotFoundError(f"{main_args_path} not found, checkpoint can't be restored.")
 
     main_args.__dict__.update(args.__dict__)
-    train_main(
+    core.main.main(
         main_args,
         base_tag=restore_path.name,
         checkpoint=ModelCheckpointSaver.latest_checkpoint(restore_path),

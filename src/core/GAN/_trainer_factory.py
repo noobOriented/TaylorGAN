@@ -8,7 +8,7 @@ import torch
 
 from core.models import Generator
 from core.preprocess import PreprocessResult
-from core.train._loss import GeneratorLoss
+from core.train import GeneratorLoss, TrainerConfigs
 from core.train._trainer_factory import _G_REGS, _OPTIMIZERS, _concat_coeff
 from library.torch_zoo.nn import LambdaModule, activations
 from library.torch_zoo.nn.masking import (
@@ -28,10 +28,7 @@ from ._loss import (
 from ._trainer import GANTrainer
 
 
-class GANObjectiveConfigs(pydantic.BaseModel):
-    g_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
-    g_regularizers: list[str] = []
-
+class GANTrainerConfigs(TrainerConfigs):
     discriminator: str = "cnn(activation='elu')"
     d_steps: t.Annotated[int, pydantic.Field(ge=1, description='update generator every n discriminator steps.')] = 1
     d_regularizers: list[str] = []

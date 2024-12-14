@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 import core.GAN.__main__
-import core.train.__main__
+import core.MLE
 from core.evaluate import evaluate_text, perplexity
 from scripts import generate_text, restore_from_checkpoint
 
@@ -65,7 +65,7 @@ class TestTrain:
                 f'--serv {serving_root} --checkpoint {checkpoint_root} --save-period 2',
             ]).split(),
         ):
-            core.train.__main__.MLE_main()
+            core.MLE.main()
 
 
 class TestSaveLoad:

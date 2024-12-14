@@ -1,1 +1,1 @@
-from ._trainer_factory import GANObjectiveConfigs
+from .__main__ import GANMainConfigs
