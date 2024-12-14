@@ -21,7 +21,7 @@ import torch
 from core.evaluate import TextGenerator
 from core.models.generators import Generator
 from core.preprocess import PreprocessResult
-from core.train import Callback, ListenableEvent, ModelCheckpointSaver, Trainer
+from core.train import Callback, ListenableEvent, ModelCheckpointSaver, GeneratorTrainer
 from library.utils import (
     SEPARATION_LINE, ExponentialMovingAverageMeter, get_seqlens, logging_indent, random_sample,
 )
@@ -60,7 +60,7 @@ class CallbackConfigs(pydantic.BaseModel):
 
     def get_callback(
         self,
-        trainer: Trainer,
+        trainer: GeneratorTrainer,
         generator: Generator,
         data: PreprocessResult,
         checkpoint: str | os.PathLike[str] | None = None,
@@ -82,7 +82,7 @@ class CallbackConfigs(pydantic.BaseModel):
 class _CallbackCreator:
     args: CallbackConfigs
     generator: Generator
-    trainer: Trainer
+    trainer: GeneratorTrainer
     data: PreprocessResult
     checkpoint: str | os.PathLike[str] | None
     base_tag: str | None = None

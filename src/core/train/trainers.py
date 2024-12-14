@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import abc
 import os
 import pathlib
 import typing as t
@@ -16,7 +15,7 @@ from library.utils import cache_method_call, logging_indent
 from .pubsub import ListenableEvent
 
 
-class Trainer(abc.ABC):
+class GeneratorTrainer:
 
     def __init__(
         self,
@@ -24,21 +23,27 @@ class Trainer(abc.ABC):
         optimizer: torch.optim.Optimizer,
         losses: t.Mapping[str, tuple[GeneratorLoss, float]],
     ):
-        self.generator = generator
-        self.generator_losses = losses
+        self._generator = generator
+        self._losses = losses
+        self._generator_state = ModuleTrainingState(generator, optimizer)
+
+        self.generator_post_step_event = self._generator_state.optimizer_post_step_event
         self.loss_update_events: dict[str, dict[str, ListenableEvent[int, float]]] = {
-            self.generator.scope: {
+            self._generator.scope: {
                 k: ListenableEvent[int, float]()
-                for k in self.generator_losses.keys()
+                for k in self._losses.keys()
             },
         }
 
-        self._generator_state = ModuleTrainingState(generator, optimizer)
-        self.generator_post_step_event = self._generator_state.optimizer_post_step_event
-
-    @abc.abstractmethod
     def fit(self, data_loader: t.Iterable[np.ndarray], /):
-        ...
+        for batch_data in data_loader:
+            real_samples = TokenSequence(
+                torch.from_numpy(batch_data).type(torch.long),
+                eos_idx=self._generator.special_tokens.EOS.idx,
+            )
+            with cache_method_call(self._generator, 'generate'):
+                g_loss = self._compute_generator_loss(real_samples)
+                self._generator_state.update_step(g_loss)
 
     def save_state(self, path: str | os.PathLike[str]):
         state_dict = [updater.state_dict() for updater in self._module_states]
@@ -51,14 +56,15 @@ class Trainer(abc.ABC):
 
     def summary(self):
         for updater in self._module_states:
-            trainable_params = sum(p.numel() for p in updater.module.parameters() if p.requires_grad)
-            fixed_params = sum(p.numel() for p in updater.module.parameters() if not p.requires_grad)
-            with logging_indent(updater.module.scope):
+            trainable_params = sum(p.numel() for p in updater._module.parameters() if p.requires_grad)
+            fixed_params = sum(p.numel() for p in updater._module.parameters() if not p.requires_grad)
+            with logging_indent(updater._module.scope):
                 with logging_indent("Model"):
                     print(f'Trainable     params: {trainable_params:>12}')
                     print(f'Non-trainable params: {fixed_params:>12,}')
 
-                print(f'Optimizer: {updater.optimizer}')
+                print(f'Optimizer: {updater._optimizer}')
+            # TODO losses
 
     @property
     def _module_states(self) -> list[ModuleTrainingState]:
@@ -66,35 +72,22 @@ class Trainer(abc.ABC):
 
     def _compute_generator_loss(self, real_samples: TokenSequence) -> torch.Tensor:
         g_losses = {
-            name: loss_fn(self.generator, real_samples)
-            for name, (loss_fn, _) in self.generator_losses.items()
+            name: loss_fn(self._generator, real_samples)
+            for name, (loss_fn, _) in self._losses.items()
         }
         for name, loss_val in g_losses.items():
-            self.loss_update_events[self.generator.scope][name](
+            self.loss_update_events[self._generator.scope][name](
                 self._generator_state.step,
                 loss_val.detach().numpy(),
             )
-        return sum(self.generator_losses[k][1] * v for k, v in g_losses.items())  # type: ignore
-
-
-class NonParametrizedTrainer(Trainer):
-
-    def fit(self, data_loader: t.Iterable[np.ndarray], /):
-        for batch_data in data_loader:
-            real_samples = TokenSequence(
-                torch.from_numpy(batch_data).type(torch.long),
-                eos_idx=self._generator_state.module.special_tokens.EOS.idx,
-            )
-            with cache_method_call(self.generator, 'generate'):
-                g_loss = self._compute_generator_loss(real_samples)
-                self._generator_state.update_step(g_loss)
+        return sum(self._losses[k][1] * v for k, v in g_losses.items())  # type: ignore
 
 
 class ModuleTrainingState[T: torch.nn.Module]:
 
     def __init__(self, module: T, optimizer: torch.optim.Optimizer):
-        self.module = module
-        self.optimizer = optimizer
+        self._module = module
+        self._optimizer = optimizer
         self._step = 0
         self.optimizer_post_step_event = ListenableEvent[int]()
 
@@ -103,28 +96,28 @@ class ModuleTrainingState[T: torch.nn.Module]:
         return self._step
 
     def update_step(self, sum_loss: torch.Tensor):
-        self.optimizer.zero_grad()
+        self._optimizer.zero_grad()
         sum_loss.backward()
-        self.optimizer.step()
+        self._optimizer.step()
         self._step += 1
         self.optimizer_post_step_event(self.step)
 
     def state_dict(self) -> dict:
         return {
-            'module': self.module.state_dict(),
-            'optimizer': self.optimizer.state_dict(),
+            'module': self._module.state_dict(),
+            'optimizer': self._optimizer.state_dict(),
             'step': self.step,
         }
 
     def load_state_dict(self, state_dict: dict):
-        self.module.load_state_dict(state_dict['module'])
-        self.optimizer.load_state_dict(state_dict['optimizer'])
+        self._module.load_state_dict(state_dict['module'])
+        self._optimizer.load_state_dict(state_dict['optimizer'])
         self._step = state_dict['step']
 
 
 class ModelCheckpointSaver:
 
-    def __init__(self, trainer: Trainer, directory: str | os.PathLike[str]):
+    def __init__(self, trainer: GeneratorTrainer, directory: str | os.PathLike[str]):
         self.trainer = trainer
         self.directory = pathlib.Path(directory)
 
