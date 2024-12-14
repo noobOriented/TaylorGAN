@@ -6,8 +6,10 @@ import rich.progress
 import yaml
 
 from core.cache import cache_center
-from core.preprocess import CorpusConfig, PreprocessResult, TextDataset, Tokenizer
 from library.utils import logging_indent
+
+from ._configs import CorpusConfig
+from ._preprocessors import PreprocessResult, TextDataset, Tokenizer
 
 
 CONFIG_PATH = 'datasets/corpus.yaml'

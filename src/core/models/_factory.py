@@ -5,9 +5,10 @@ import pydantic
 import torch
 from torch.nn import Embedding, GRUCell, Linear, Sequential
 
-from core.models import AutoRegressiveGenerator, Generator
 from core.preprocess import PreprocessResult
 from library.utils import LookUpCall
+
+from .generators import AutoRegressiveGenerator, Generator
 
 
 class GeneratorConfigs(pydantic.BaseModel):

@@ -4,10 +4,10 @@ import typing as t
 
 import pydantic
 
-from factories.callback_factory import CallbackConfigs
-from factories.data_factory import DataConfigs
-from factories.generator_factory import GeneratorConfigs
-from factories.trainer_factory import GANObjectiveConfigs, MLEObjectiveConfigs
+from core.GAN import GANObjectiveConfigs
+from core.models import GeneratorConfigs
+from core.preprocess import DataConfigs
+from core.train import CallbackConfigs, MLEObjectiveConfigs
 
 
 class _CommonTrainingConfigs(CallbackConfigs, DataConfigs, GeneratorConfigs):

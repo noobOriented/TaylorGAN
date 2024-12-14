@@ -53,8 +53,8 @@ class EmbeddingRegularizer(DiscriminatorLoss):
     def __init__(self, max_norm: float = 0.):
         self.max_norm = max_norm
 
-    def __call__(self, discriminator, *args, **kwargs):
-        weight: torch.nn.Parameter = discriminator.embedding_weight
+    def __call__(self, discriminator: Discriminator, *args, **kwargs):
+        weight = discriminator.embedding_weight
         if not weight.requires_grad:
             raise RuntimeError
 

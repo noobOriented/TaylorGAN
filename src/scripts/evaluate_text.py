@@ -3,8 +3,7 @@ import pathlib
 import typing as t
 
 from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
-from core.preprocess import TextDataset
-from factories import data_factory
+from core.preprocess import DataConfigs, TextDataset
 from library.utils import parse_args_as, random_sample
 
 
@@ -14,7 +13,7 @@ RLM_EPOCHS = 100
 
 
 def main():
-    class Args(data_factory.DataConfigs):
+    class Args(DataConfigs):
         eval_path: pathlib.Path
         bleu: int | None = None
         fed: int | None = None

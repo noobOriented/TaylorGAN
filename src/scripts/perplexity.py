@@ -4,13 +4,13 @@ import typing as t
 import pydantic
 
 from core.evaluate import TextGenerator
-from factories import data_factory
+from core.preprocess import DataConfigs
 from library.utils import parse_args_as
 
 
 def main():
 
-    class Args(data_factory.DataConfigs):
+    class Args(DataConfigs):
         model_path: t.Annotated[pathlib.Path, pydantic.Field(description='path of serving model folder.')]
 
     args = parse_args_as(Args)
