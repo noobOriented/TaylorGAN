@@ -38,9 +38,8 @@ class MLEObjectiveConfigs(pydantic.BaseModel):
         generator_updater = ModuleUpdater(
             generator,
             optimizer=_OPTIMIZERS(self.g_optimizer)(generator.parameters()),
-            losses=losses,
         )
-        return NonParametrizedTrainer(generator_updater)
+        return NonParametrizedTrainer(generator_updater, losses=losses)
 
 
 class GANObjectiveConfigs(pydantic.BaseModel):
@@ -81,13 +80,13 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             generator_updater=ModuleUpdater(
                 generator,
                 optimizer=_OPTIMIZERS(self.g_optimizer)(generator.parameters()),
-                losses=g_losses,
             ),
+            losses=g_losses,
             discriminator_updater=ModuleUpdater(
                 discriminator,
                 optimizer=_OPTIMIZERS(self.d_optimizer)(discriminator.parameters()),
-                losses=d_losses,
             ),
+            discriminator_losses=d_losses,
             d_steps=self.d_steps,
         )
 

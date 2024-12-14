@@ -6,9 +6,10 @@ import typing as t
 import numpy as np
 import torch
 
+from core.losses import GeneratorLoss
 from core.models import Generator
 from core.models.sequence_modeling import TokenSequence
-from core.train import ModuleUpdater, Trainer
+from core.train import ListenableEvent, ModuleUpdater, Trainer
 from library.utils import cache_method_call
 
 from .discriminators import Discriminator, DiscriminatorLoss
@@ -19,15 +20,21 @@ class GANTrainer(Trainer):
     def __init__(
         self,
         generator_updater: ModuleUpdater[Generator],
+        losses: t.Mapping[str, tuple[GeneratorLoss, float]],
         discriminator_updater: ModuleUpdater[Discriminator],
+        discriminator_losses: t.Mapping[str, tuple[DiscriminatorLoss, float]],
         d_steps: int = 1,
     ):
-        super().__init__(generator_updater)
+        super().__init__(generator_updater, losses)
 
         self.discriminator_updater = discriminator_updater
         self.discriminator = discriminator_updater.module
-        self.discriminator_losses: t.Mapping[str, tuple[DiscriminatorLoss, float]] = discriminator_updater.losses
+        self.discriminator_losses: t.Mapping[str, tuple[DiscriminatorLoss, float]] = discriminator_losses
         self.d_steps = d_steps
+        self.loss_update_events[self.discriminator.scope] = {
+            k: ListenableEvent()
+            for k in discriminator_losses.keys()
+        }
 
     def fit(self, data_loader: t.Iterable[np.ndarray], /):
         for batch_data in data_loader:
@@ -58,7 +65,7 @@ class GANTrainer(Trainer):
             for name, (loss_fn, _) in self.discriminator_losses.items()
         }
         for name, loss_val in losses.items():
-            self.discriminator_updater.loss_update_events[name](
+            self.loss_update_events[self.discriminator.scope][name](
                 self.discriminator_updater.step,
                 loss_val.detach().numpy(),
             )

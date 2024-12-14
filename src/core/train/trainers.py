@@ -18,10 +18,20 @@ from .pubsub import ListenableEvent
 
 class Trainer(abc.ABC):
 
-    def __init__(self, generator_updater: ModuleUpdater[Generator]):
+    def __init__(
+        self,
+        generator_updater: ModuleUpdater[Generator],
+        losses: t.Mapping[str, tuple[GeneratorLoss, float]],
+    ):
         self.generator_updater = generator_updater
         self.generator = generator_updater.module
-        self.generator_losses: t.Mapping[str, tuple[GeneratorLoss, float]] = generator_updater.losses
+        self.generator_losses = losses
+        self.loss_update_events: dict[str, dict[str, ListenableEvent[int, float]]] = {
+            self.generator.scope: {
+                k: ListenableEvent[int, float]()
+                for k in self.generator_losses.keys()
+            },
+        }
 
     @abc.abstractmethod
     def fit(self, data_loader: t.Iterable[np.ndarray], /):
@@ -50,9 +60,6 @@ class Trainer(abc.ABC):
                     print(f'Non-trainable params: {fixed_params:>12,}')
 
                 print(f'Optimizer: {updater.optimizer}')
-                with logging_indent("Objective:"):
-                    for loss in updater.losses:
-                        print(loss)
 
     def _compute_generator_loss(self, real_samples: TokenSequence) -> torch.Tensor:
         g_losses = {
@@ -60,7 +67,7 @@ class Trainer(abc.ABC):
             for name, (loss_fn, _) in self.generator_losses.items()
         }
         for name, loss_val in g_losses.items():
-            self.generator_updater.loss_update_events[name](
+            self.loss_update_events[self.generator.scope][name](
                 self.generator_updater.step,
                 loss_val.detach().numpy(),
             )
@@ -82,25 +89,11 @@ class NonParametrizedTrainer(Trainer):
 
 class ModuleUpdater[T: torch.nn.Module]:
 
-    def __init__(
-        self,
-        module: T,
-        optimizer: torch.optim.Optimizer,
-        losses: t.Mapping[
-            str,
-            tuple[t.Callable[..., torch.Tensor], float]
-        ],
-    ):
+    def __init__(self, module: T, optimizer: torch.optim.Optimizer):
         self.module = module
         self.optimizer = optimizer
-        self.losses = losses
-
         self._step = 0
         self.optimizer_post_step_event = ListenableEvent[int]()
-        self.loss_update_events = {
-            k: ListenableEvent[int, float]()
-            for k in losses.keys()
-        }
 
     @property
     def step(self) -> int:

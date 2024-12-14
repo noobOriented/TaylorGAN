@@ -229,13 +229,13 @@ class _CallbackCreator:
                     0,
                 )
 
-            for updater in self.trainer.updaters:
-                for name, event in updater.loss_update_events.items():
+            for scope, events in self.trainer.loss_update_events.items():
+                for name, event in events.items():
                     @event.register_hook
                     @_run_every(10)
                     def update_losses(step: int, val: float, name=name):
                         writer.add_scalar(
-                            tag=f'losses/{updater.module.scope}/{name}',
+                            tag=f'losses/{scope}/{name}',
                             scalar_value=val,
                             global_step=step,  # TODO enerator step?
                         )
@@ -286,11 +286,10 @@ class _CallbackCreator:
             warnings.warn("`checkpoint_root` is not given. Training can't be restored!")
 
     def _create_modules_panels(self):
-
-        for updater in self.trainer.updaters:
+        for scope, events in self.trainer.loss_update_events.items():
             progress = rich.progress.Progress('{task.description}', '{task.fields[value]:.3}')
 
-            for name, event in updater.loss_update_events.items():
+            for name, event in events.items():
                 task_id = progress.add_task(name, value='nan')
                 ema = ExponentialMovingAverageMeter(decay=0.9)
 
@@ -300,7 +299,7 @@ class _CallbackCreator:
 
             yield rich.panel.Panel(
                 progress,
-                title=updater.module.scope,
+                title=scope,
                 border_style='blue',
                 padding=(0, 2),
                 expand=True,
