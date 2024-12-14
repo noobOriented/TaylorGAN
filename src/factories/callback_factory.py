@@ -132,14 +132,14 @@ class _CallbackCreator:
 
     def _attach_evaluators(self):
 
-        @self.trainer.generator_updater.optimizer_post_step_event.register_hook
+        @self.trainer.generator_post_step_event.register_hook
         @_run_every(10)
         def calculate_avg_length(step: int, event=self.metric_update_events['avg length']):
             ids = self.text_generator.generate_ids(10)
             mean_length = np.mean(get_seqlens(ids, self.data.special_tokens.EOS.idx))
             event(step, float(mean_length))
 
-        @self.trainer.generator_updater.optimizer_post_step_event.register_hook
+        @self.trainer.generator_post_step_event.register_hook
         @_run_every(100)
         def log_texts(step: int):
             sentences = self.text_generator.generate_texts(3)
@@ -166,7 +166,7 @@ class _CallbackCreator:
                         smoothing=SmoothingFunction.fuzz_smoothing,
                     )
 
-                @self.trainer.generator_updater.optimizer_post_step_event.register_hook
+                @self.trainer.generator_post_step_event.register_hook
                 @_run_every(10)
                 def compute_bleu(step: int, c=calculator, event=self.metric_update_events[f'{tag} BLEU 1~{ngram}']):
                     ids = self.text_generator.generate_ids(self.args.batch_size)

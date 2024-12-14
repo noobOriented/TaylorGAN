@@ -9,7 +9,7 @@ import torch
 from core.losses import GeneratorLoss
 from core.models import Generator
 from core.models.sequence_modeling import TokenSequence
-from core.train import ListenableEvent, ModuleUpdater, Trainer
+from core.train import ListenableEvent, ModuleTrainingState, Trainer
 from library.utils import cache_method_call
 
 from .discriminators import Discriminator, DiscriminatorLoss
@@ -19,28 +19,31 @@ class GANTrainer(Trainer):
 
     def __init__(
         self,
-        generator_updater: ModuleUpdater[Generator],
+        generator: Generator,
+        optimizer: torch.optim.Optimizer,
         losses: t.Mapping[str, tuple[GeneratorLoss, float]],
-        discriminator_updater: ModuleUpdater[Discriminator],
+        discriminator: Discriminator,
+        discriminator_optimizer: torch.optim.Optimizer,
         discriminator_losses: t.Mapping[str, tuple[DiscriminatorLoss, float]],
         d_steps: int = 1,
     ):
-        super().__init__(generator_updater, losses)
+        super().__init__(generator, optimizer, losses)
 
-        self.discriminator_updater = discriminator_updater
-        self.discriminator = discriminator_updater.module
-        self.discriminator_losses: t.Mapping[str, tuple[DiscriminatorLoss, float]] = discriminator_losses
+        self.discriminator = discriminator
+        self.discriminator_losses = discriminator_losses
         self.d_steps = d_steps
         self.loss_update_events[self.discriminator.scope] = {
             k: ListenableEvent()
             for k in discriminator_losses.keys()
         }
 
+        self._discriminator_state = ModuleTrainingState(discriminator, discriminator_optimizer)
+
     def fit(self, data_loader: t.Iterable[np.ndarray], /):
         for batch_data in data_loader:
             real_samples = TokenSequence(
                 torch.from_numpy(batch_data).type(torch.long),
-                eos_idx=self.generator_updater.module.special_tokens.EOS.idx,
+                eos_idx=self._generator_state.module.special_tokens.EOS.idx,
             )
             with (
                 cache_method_call(self.generator, 'generate'),
@@ -49,14 +52,14 @@ class GANTrainer(Trainer):
                 cache_method_call(self.discriminator, 'get_embedding'),
             ):
                 sum_loss = self._compute_discriminator_loss(real_samples)
-                self.discriminator_updater.update_step(sum_loss)
-                if self.discriminator_updater.step % self.d_steps == 0:
+                self._discriminator_state.update_step(sum_loss)
+                if self._discriminator_state.step % self.d_steps == 0:
                     sum_loss = self._compute_generator_loss(real_samples)
-                    self.generator_updater.update_step(sum_loss)
+                    self._generator_state.update_step(sum_loss)
 
     @property
-    def updaters(self):
-        return super().updaters + [self.discriminator_updater]
+    def _module_states(self):
+        return super()._module_states + [self._discriminator_state]
 
     def _compute_discriminator_loss(self, real_samples: TokenSequence) -> torch.Tensor:
         fake_samples = self.generator.generate(real_samples.batch_size, real_samples.maxlen)
@@ -66,7 +69,7 @@ class GANTrainer(Trainer):
         }
         for name, loss_val in losses.items():
             self.loss_update_events[self.discriminator.scope][name](
-                self.discriminator_updater.step,
+                self._discriminator_state.step,
                 loss_val.detach().numpy(),
             )
 

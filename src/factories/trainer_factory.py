@@ -15,7 +15,7 @@ from core.GAN.discriminators import DiscriminatorLoss, EmbeddingRegularizer, Spe
 from core.losses import EntropyRegularizer, GeneratorLoss, mean_negative_log_likelihood
 from core.models import Generator
 from core.preprocess import PreprocessResult
-from core.train import ModuleUpdater, NonParametrizedTrainer
+from core.train import NonParametrizedTrainer
 from core.train.optimizer import add_custom_optimizer_args
 from library.torch_zoo.nn import LambdaModule, activations
 from library.torch_zoo.nn.masking import (
@@ -35,11 +35,11 @@ class MLEObjectiveConfigs(pydantic.BaseModel):
             (reg, coeff), info = _G_REGS(s, return_info=True)
             losses[info.func_name] = (reg, coeff)
 
-        generator_updater = ModuleUpdater(
+        return NonParametrizedTrainer(
             generator,
             optimizer=_OPTIMIZERS(self.g_optimizer)(generator.parameters()),
+            losses=losses,
         )
-        return NonParametrizedTrainer(generator_updater, losses=losses)
 
 
 class GANObjectiveConfigs(pydantic.BaseModel):
@@ -77,15 +77,11 @@ class GANObjectiveConfigs(pydantic.BaseModel):
             d_losses[info.func_name] = (reg, coeff)
 
         return GANTrainer(
-            generator_updater=ModuleUpdater(
-                generator,
-                optimizer=_OPTIMIZERS(self.g_optimizer)(generator.parameters()),
-            ),
+            generator,
+            optimizer=_OPTIMIZERS(self.g_optimizer)(generator.parameters()),
             losses=g_losses,
-            discriminator_updater=ModuleUpdater(
-                discriminator,
-                optimizer=_OPTIMIZERS(self.d_optimizer)(discriminator.parameters()),
-            ),
+            discriminator=discriminator,
+            discriminator_optimizer=_OPTIMIZERS(self.d_optimizer)(discriminator.parameters()),
             discriminator_losses=d_losses,
             d_steps=self.d_steps,
         )
