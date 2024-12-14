@@ -12,12 +12,13 @@ python = "^3.12"
 python-dotenv = "*"
 more-itertools = "*"
 tensorboardx = "*"
-tensorflow = "1.13.1"
-tensorflow-hub = "0.7.0"
 pyyaml = "*"
 torch = "^2.0.0"
 pydantic = "^2.10.2"
 rich = "^13.9.4"
+
+tensorflow = { version = "^1.13.1", optional = true }
+tensorflow-hub = { version = "^0.7.0", optional = true }
 
 [tool.poetry.group.dev.dependencies]
 wemake-python-styleguide = ">=0.17"
@@ -25,6 +26,9 @@ ipdb = "*"
 pytest = "*"
 pytest-cov = "*"
 pytest-dependency = "*"
+
+[tool.poetry.extras]
+tensorflow = ["tensorflow", "tensorflow-hub"]
 
 [tool.poetry.scripts]
 GAN = "scripts.train:GAN_main"

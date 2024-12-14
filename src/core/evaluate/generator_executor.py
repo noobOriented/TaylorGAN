@@ -1,3 +1,4 @@
+import os
 import typing as t
 
 import numpy as np
@@ -25,7 +26,7 @@ class TextGenerator:
             for ids in self.generate_ids(size, temperature=temperature)
         ]
 
-    def generate_ids(self, size: int, *, temperature: float = 1) -> npt.NDArray[np.uint8]:
+    def generate_ids(self, size: int, *, temperature: float = 1) -> npt.NDArray[np.uint]:
         return np.concatenate(
             [
                 self.generator.forward(
@@ -50,8 +51,7 @@ class TextGenerator:
                 total_words += inputs.shape[0] * inputs.shape[1]
 
         avg_NLL: torch.Tensor = total_NLL / total_words
-        perplexity = avg_NLL.exp().numpy()
-        return perplexity
+        return avg_NLL.exp().numpy()
 
     def export_traced(self):
         inputs = {
@@ -68,11 +68,11 @@ class TextGenerator:
         return self._tokenizer.ids_to_text(word_ids)
 
     @classmethod
-    def load_traced(cls, path, tokenizer):
+    def load_traced(cls, path: str | os.PathLike[str], tokenizer: Tokenizer):
         return cls(torch.jit.load(str(path)), tokenizer)
 
 
-def compute_batch_size(total_size, batch_size):
+def compute_batch_size(total_size: int, batch_size: int) -> t.Iterator[int]:
     q, m = divmod(total_size, batch_size)
     for _ in range(q):
         yield batch_size

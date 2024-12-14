@@ -6,51 +6,54 @@ import typing as t
 import numpy as np
 import torch
 
+from core.losses import GeneratorLoss
+from core.models import Generator
 from core.models.sequence_modeling import TokenSequence
-from core.train import GeneratorUpdater, ModuleUpdater, Trainer
+from core.train import ModuleUpdater, GeneratorTrainer
 from library.utils import cache_method_call
 
-from .discriminators import Discriminator
+from .discriminators import Discriminator, DiscriminatorLoss
 
 
-class GANTrainer(Trainer):
+class GANTrainer(GeneratorTrainer):
 
     def __init__(
         self,
-        generator_updater: GeneratorUpdater,
-        discriminator_updater: DiscriminatorUpdater,
+        generator: Generator,
+        optimizer: torch.optim.Optimizer,
+        losses: t.Mapping[str, tuple[GeneratorLoss, float]],
+        discriminator: Discriminator,
+        discriminator_optimizer: torch.optim.Optimizer,
+        discriminator_losses: t.Mapping[str, tuple[DiscriminatorLoss, float]],
         d_steps: int = 1,
     ):
-        super().__init__(generator_updater)
-        self.discriminator_updater = discriminator_updater
-        self.d_steps = d_steps
+        super().__init__(generator, optimizer, losses)
+        self._discriminator = discriminator
+        self._d_steps = d_steps
+        self._discriminator_updater = ModuleUpdater(
+            discriminator,
+            discriminator_optimizer,
+            discriminator_losses,
+        )
+        self.loss_update_events['Discriminator'] = self._discriminator_updater.loss_update_events
 
     def fit(self, data_loader: t.Iterable[np.ndarray], /):
         for batch_data in data_loader:
             real_samples = TokenSequence(
                 torch.from_numpy(batch_data).type(torch.long),
-                eos_idx=self.generator_updater.module.special_tokens.EOS.idx,
+                eos_idx=self._generator.special_tokens.EOS.idx,
             )
-            batch_size, maxlen = batch_data.shape
-            fake_samples = self.generator_updater.module.generate(batch_size, maxlen)
-            self.discriminator_updater.update_step(real_samples, fake_samples)
-            if self.discriminator_updater.step % self.d_steps == 0:
-                self.generator_updater.update_step(real_samples)
+            with (
+                cache_method_call(self._generator, 'generate'),
+                cache_method_call(self._discriminator, 'score_samples'),
+                cache_method_call(self._discriminator, 'score_word_vector'),
+                cache_method_call(self._discriminator, 'get_embedding'),
+            ):
+                fake_samples = self._generator.generate(real_samples.batch_size, real_samples.maxlen)
+                self._discriminator_updater.update_step(real_samples, fake_samples)
+                if self._discriminator_updater.step % self._d_steps == 0:
+                    self._generator_updater.update_step(real_samples)
 
     @property
-    def updaters(self):
-        return super().updaters + [self.discriminator_updater]
-
-
-class DiscriminatorUpdater(ModuleUpdater[Discriminator]):
-
-    def compute_loss(self, real_samples, fake_samples):
-        with (
-            cache_method_call(self.module, 'score_samples'),
-            cache_method_call(self.module, 'score_word_vector'),
-            cache_method_call(self.module, 'get_embedding'),
-        ):
-            return {
-                name: loss(self.module, real_samples=real_samples, fake_samples=fake_samples)
-                for name, (loss, _) in self.losses.items()
-            }
+    def _updaters(self):
+        return super()._updaters + [self._discriminator_updater]
