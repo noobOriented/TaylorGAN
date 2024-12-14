@@ -3,9 +3,10 @@ import typing as t
 
 import pydantic
 
-from core.evaluate import TextGenerator
 from core.preprocess import DataConfigs
 from library.utils import parse_args_as
+
+from .generator_executor import TextGenerator
 
 
 def main():

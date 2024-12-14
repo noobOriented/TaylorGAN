@@ -4,7 +4,10 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts import evaluate_text, generate_text, perplexity, restore_from_checkpoint, train
+import core.GAN.__main__
+import core.train.__main__
+from core.evaluate import evaluate_text, perplexity
+from scripts import generate_text, restore_from_checkpoint
 
 
 @pytest.fixture(scope='session')
@@ -50,7 +53,7 @@ class TestTrain:
                 f'--serv {serving_root} --checkpoint {checkpoint_root} --save-period 2',
             ]).split(),
         ):
-            train.GAN_main()
+            core.GAN.__main__.main()
 
     def test_MLE(self, serving_root, checkpoint_root):
         with patch(
@@ -62,7 +65,7 @@ class TestTrain:
                 f'--serv {serving_root} --checkpoint {checkpoint_root} --save-period 2',
             ]).split(),
         ):
-            train.MLE_main()
+            core.train.__main__.MLE_main()
 
 
 class TestSaveLoad:

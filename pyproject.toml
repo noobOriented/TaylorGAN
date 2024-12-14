@@ -31,8 +31,8 @@ pytest-dependency = "*"
 tensorflow = ["tensorflow", "tensorflow-hub"]
 
 [tool.poetry.scripts]
-GAN = "scripts.train:GAN_main"
-MLE = "scripts.train:MLE_main"
+GAN = "core.GAN.__main__:main"
+MLE = "core.train.__main__:MLE_main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

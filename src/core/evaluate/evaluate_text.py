@@ -2,9 +2,11 @@ import os
 import pathlib
 import typing as t
 
-from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
 from core.preprocess import DataConfigs, TextDataset
 from library.utils import parse_args_as, random_sample
+
+from .bleu import BLEUCalculator, SmoothingFunction
+from .fed import FEDCalculator
 
 
 # HUB_URL = "https://tfhub.dev/google/universal-sentence-encoder-large/3"
