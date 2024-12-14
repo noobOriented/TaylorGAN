@@ -7,12 +7,11 @@ import numpy as np
 import torch
 
 from core.losses import GeneratorLoss
-from core.models import Generator
-from core.models.sequence_modeling import TokenSequence
-from core.train import ModuleUpdater, GeneratorTrainer
+from core.models import Generator, TokenSequence
+from core.train import GeneratorTrainer, ModuleUpdater
 from library.utils import cache_method_call
 
-from .discriminators import Discriminator, DiscriminatorLoss
+from ._discriminator import Discriminator, DiscriminatorLoss
 
 
 class GANTrainer(GeneratorTrainer):

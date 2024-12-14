@@ -1,2 +1,3 @@
 from ._factory import GeneratorConfigs
-from .generators import AutoRegressiveGenerator, Generator
+from ._generator import AutoRegressiveGenerator, Generator
+from ._types import SampledTokenSequence, TokenSequence

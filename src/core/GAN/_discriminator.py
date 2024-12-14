@@ -3,7 +3,7 @@ import typing as t
 
 import torch
 
-from core.models.sequence_modeling import TokenSequence
+from core.models import TokenSequence
 
 
 class Discriminator(torch.nn.Module):

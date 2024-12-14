@@ -17,15 +17,15 @@ from library.torch_zoo.nn.masking import (
 from library.torch_zoo.nn.resnet import ResBlock
 from library.utils import ArgumentBinder, LookUpCall
 
-from .discriminators import (
+from ._discriminator import (
     Discriminator, DiscriminatorLoss, EmbeddingRegularizer,
     GradientPenaltyRegularizer, SpectralRegularizer, WordVectorRegularizer,
 )
-from .loss import (
+from ._loss import (
     BCE, GANLossTuple, GANObjective, GumbelSoftmaxEstimator,
     ReinforceEstimator, StraightThroughEstimator, TaylorEstimator,
 )
-from .trainer import GANTrainer
+from ._trainer import GANTrainer
 
 
 class GANObjectiveConfigs(pydantic.BaseModel):

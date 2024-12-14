@@ -8,11 +8,10 @@ import numpy as np
 import torch
 
 from core.losses import GeneratorLoss
-from core.models import Generator
-from core.models.sequence_modeling import TokenSequence
+from core.models import Generator, TokenSequence
 from library.utils import cache_method_call, logging_indent
 
-from .pubsub import ListenableEvent
+from ._pubsub import ListenableEvent
 
 
 class GeneratorTrainer:

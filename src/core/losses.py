@@ -2,8 +2,7 @@ import typing as t
 
 import torch
 
-from core.models import AutoRegressiveGenerator, Generator
-from core.models.sequence_modeling import TokenSequence
+from core.models import AutoRegressiveGenerator, Generator, TokenSequence
 from library.torch_zoo.functions import masked_reduce
 
 

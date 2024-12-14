@@ -19,15 +19,15 @@ import rich.table
 import torch
 
 from core.evaluate import TextGenerator
-from core.models.generators import Generator
+from core.models import Generator
 from core.preprocess import PreprocessResult
 from library.utils import (
     SEPARATION_LINE, ExponentialMovingAverageMeter, get_seqlens, logging_indent, random_sample,
 )
 
-from .fit_loop import Callback
-from .pubsub import ListenableEvent
-from .trainers import GeneratorTrainer, ModelCheckpointSaver
+from ._fit_loop import Callback
+from ._pubsub import ListenableEvent
+from ._trainer import GeneratorTrainer, ModelCheckpointSaver
 
 
 class CallbackConfigs(pydantic.BaseModel):
