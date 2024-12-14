@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from .. import TaylorEstimator
+from .._loss import TaylorEstimator
 
 
 def test_taylor_first_order():

@@ -2,7 +2,8 @@ import pathlib
 
 import pytest
 
-from .. import CorpusConfig, Tokenizer
+from .._configs import CorpusConfig
+from .._preprocessors import Tokenizer
 from .._segmentor import EnglishSegmentor
 
 

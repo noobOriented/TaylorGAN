@@ -4,11 +4,11 @@ import more_itertools
 import pydantic
 import torch
 
-from core.losses import EntropyRegularizer, GeneratorLoss, mean_negative_log_likelihood
 from core.models import Generator
 from core.preprocess import PreprocessResult
 from library.utils import ArgumentBinder, LookUpCall, wraps_with_new_signature
 
+from ._loss import EntropyRegularizer, GeneratorLoss, mean_negative_log_likelihood
 from ._trainer import GeneratorTrainer
 
 

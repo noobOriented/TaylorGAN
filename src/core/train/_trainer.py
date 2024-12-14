@@ -7,10 +7,10 @@ import typing as t
 import numpy as np
 import torch
 
-from core.losses import GeneratorLoss
 from core.models import Generator, TokenSequence
 from library.utils import cache_method_call, logging_indent
 
+from ._loss import GeneratorLoss
 from ._pubsub import ListenableEvent
 
 

@@ -6,9 +6,8 @@ import typing as t
 import numpy as np
 import torch
 
-from core.losses import GeneratorLoss
 from core.models import Generator, TokenSequence
-from core.train import GeneratorTrainer, ModuleUpdater
+from core.train import GeneratorLoss, GeneratorTrainer, ModuleUpdater
 from library.utils import cache_method_call
 
 from ._discriminator import Discriminator, DiscriminatorLoss

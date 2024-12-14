@@ -6,9 +6,9 @@ import typing as t
 import pydantic
 import torch
 
-from core.losses import GeneratorLoss
 from core.models import Generator
 from core.preprocess import PreprocessResult
+from core.train._loss import GeneratorLoss
 from core.train._trainer_factory import _G_REGS, _OPTIMIZERS, _concat_coeff
 from library.torch_zoo.nn import LambdaModule, activations
 from library.torch_zoo.nn.masking import (
