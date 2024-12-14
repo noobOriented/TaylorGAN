@@ -18,12 +18,12 @@ import rich.progress
 import rich.table
 import torch
 
-from core.evaluate import TextGenerator
 from core.models import Generator
-from core.preprocess import PreprocessResult
+from evaluate import TextGenerator
 from library.utils import (
     SEPARATION_LINE, ExponentialMovingAverageMeter, get_seqlens, logging_indent, random_sample,
 )
+from preprocess import PreprocessResult
 
 from ._fit_loop import Callback
 from ._pubsub import ListenableEvent
@@ -156,7 +156,7 @@ class _CallbackCreator:
             print()
 
         if ngram := self.args.bleu:
-            from core.evaluate import BLEUCalculator, SmoothingFunction
+            from evaluate.bleu import BLEUCalculator, SmoothingFunction
 
             for tag, dataset in self.data.dataset.items():
                 with logging_indent(f"Building '{tag}' data BLEU table..."):
@@ -189,7 +189,7 @@ class _CallbackCreator:
                 event(epoch, mean_sbleu)
 
         if fed_sample_size := self.args.fed:
-            from core.evaluate import FEDCalculator
+            from evaluate.fed import FEDCalculator
 
             for tag, dataset in self.data.dataset.items():
                 print(f"Building '{tag}' data FED sentence encoder...")

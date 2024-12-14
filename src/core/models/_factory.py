@@ -5,8 +5,8 @@ import pydantic
 import torch
 from torch.nn import Embedding, GRUCell, Linear, Sequential
 
-from core.preprocess import PreprocessResult
 from library.utils import LookUpCall
+from preprocess import PreprocessResult
 
 from ._generator import AutoRegressiveGenerator, Generator
 

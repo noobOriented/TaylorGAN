@@ -6,8 +6,8 @@ import numpy.typing as npt
 import torch
 
 from core.models import AutoRegressiveGenerator, Generator
-from core.preprocess import Tokenizer
 from library.utils import batch_generator
+from preprocess import Tokenizer
 
 
 class TextGenerator:

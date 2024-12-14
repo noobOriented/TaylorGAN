@@ -1,8 +1,8 @@
 import argparse
 import pathlib
 
-from core.evaluate import TextGenerator
-from core.preprocess import Tokenizer
+from evaluate import TextGenerator
+from preprocess import Tokenizer
 
 
 def main():

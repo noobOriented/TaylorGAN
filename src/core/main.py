@@ -9,9 +9,9 @@ import pydantic
 import torch
 
 from core.models import GeneratorConfigs
-from core.preprocess import DataConfigs
 from core.train import CallbackConfigs, DataLoader, ModelCheckpointSaver, TrainerConfigs
 from library.utils import format_highlight, logging_indent, parse_args_as
+from preprocess import DataConfigs
 
 
 def main(

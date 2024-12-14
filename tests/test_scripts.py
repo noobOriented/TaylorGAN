@@ -6,7 +6,7 @@ import pytest
 
 import core.GAN.__main__
 import core.MLE
-from core.evaluate import evaluate_text, perplexity
+from evaluate import evaluate_text, perplexity
 from scripts import generate_text, restore_from_checkpoint
 
 

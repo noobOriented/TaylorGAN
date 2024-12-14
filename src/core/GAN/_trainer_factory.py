@@ -7,7 +7,6 @@ import pydantic
 import torch
 
 from core.models import Generator
-from core.preprocess import PreprocessResult
 from core.train import GeneratorLoss, TrainerConfigs
 from core.train._trainer_factory import _G_REGS, _OPTIMIZERS, _concat_coeff
 from library.torch_zoo.nn import LambdaModule, activations
@@ -16,6 +15,7 @@ from library.torch_zoo.nn.masking import (
 )
 from library.torch_zoo.nn.resnet import ResBlock
 from library.utils import ArgumentBinder, LookUpCall
+from preprocess import PreprocessResult
 
 from ._discriminator import (
     Discriminator, DiscriminatorLoss, EmbeddingRegularizer,

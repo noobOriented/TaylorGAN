@@ -3,8 +3,8 @@ import typing as t
 
 import pydantic
 
-from core.preprocess import DataConfigs
 from library.utils import parse_args_as
+from preprocess import DataConfigs
 
 from .generator_executor import TextGenerator
 

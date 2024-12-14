@@ -2,8 +2,8 @@ import os
 import pathlib
 import typing as t
 
-from core.preprocess import DataConfigs, TextDataset
 from library.utils import parse_args_as, random_sample
+from preprocess import DataConfigs, TextDataset
 
 from .bleu import BLEUCalculator, SmoothingFunction
 from .fed import FEDCalculator
