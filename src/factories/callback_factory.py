@@ -133,24 +133,24 @@ class _CallbackCreator:
     def _attach_evaluators(self):
 
         @self.trainer.generator_updater.optimizer_post_step_event.register_hook
+        @_run_every(10)
         def calculate_avg_length(step: int, event=self.metric_update_events['avg length']):
-            if step % 10 == 0:
-                ids = self.text_generator.generate_ids(10)
-                mean_length = np.mean(get_seqlens(ids, self.data.special_tokens.EOS.idx))
-                event(step, float(mean_length))
+            ids = self.text_generator.generate_ids(10)
+            mean_length = np.mean(get_seqlens(ids, self.data.special_tokens.EOS.idx))
+            event(step, float(mean_length))
 
         @self.trainer.generator_updater.optimizer_post_step_event.register_hook
+        @_run_every(100)
         def log_texts(step: int):
-            if step % 100 == 0:
-                sentences = self.text_generator.generate_texts(3)
-                print(SEPARATION_LINE)
-                print()
-                rich.print('[blue]Real Sentences (random sampled):')
-                _print_samples(random_sample(self.data.dataset['train'].texts, len(sentences)))
-                print()
-                rich.print('[red]Fake Sentences (random sampled):')
-                _print_samples(sentences)
-                print()
+            sentences = self.text_generator.generate_texts(3)
+            print(SEPARATION_LINE)
+            print()
+            rich.print('[blue]Real Sentences (random sampled):')
+            _print_samples(random_sample(self.data.dataset['train'].texts, len(sentences)))
+            print()
+            rich.print('[red]Fake Sentences (random sampled):')
+            _print_samples(sentences)
+            print()
 
         if ngram := self.args.bleu:
             from core.evaluate import BLEUCalculator, SmoothingFunction
@@ -167,15 +167,16 @@ class _CallbackCreator:
                     )
 
                 @self.trainer.generator_updater.optimizer_post_step_event.register_hook
+                @_run_every(10)
                 def compute_bleu(step: int, c=calculator, event=self.metric_update_events[f'{tag} BLEU 1~{ngram}']):
-                    if step % 10 == 0:
-                        ids = self.text_generator.generate_ids(self.args.batch_size)
-                        mean_bleu = c.bleu(ids).mean(0)
-                        event(step, mean_bleu)
+                    ids = self.text_generator.generate_ids(self.args.batch_size)
+                    mean_bleu = c.bleu(ids).mean(0)
+                    event(step, mean_bleu)
 
             @self.callback.on_epoch_end.register_hook
             def compute_selfbleu(epoch: int, event=self.metric_update_events[f'self BLEU 1~{ngram}']):
-                ids = self.text_generator.generate_ids(len(self.data.dataset['train']))
+                data_size = len(self.data.dataset['train'])
+                ids = self.text_generator.generate_ids(data_size)
                 mean_sbleu = BLEUCalculator.selfbleu(
                     ids,
                     max_gram=ngram,
@@ -231,13 +232,13 @@ class _CallbackCreator:
             for updater in self.trainer.updaters:
                 for name, event in updater.loss_update_events.items():
                     @event.register_hook
+                    @_run_every(10)
                     def update_losses(step: int, val: float, name=name):
-                        if step % 10 == 0:
-                            writer.add_scalar(
-                                tag=f'losses/{updater.module.scope}/{name}',
-                                scalar_value=val,
-                                global_step=step,  # TODO enerator step?
-                            )
+                        writer.add_scalar(
+                            tag=f'losses/{updater.module.scope}/{name}',
+                            scalar_value=val,
+                            global_step=step,  # TODO enerator step?
+                        )
 
             for name, channel in self.metric_update_events.items():
                 @channel.register_hook
@@ -255,12 +256,12 @@ class _CallbackCreator:
             (serving_dir / 'tokenizer.json').write_text(self.data.tokenizer.model_dump_json())
 
             @self.callback.on_epoch_end.register_hook
+            @_run_every(self.args.save_period)
             def save_torch(epoch):
-                if epoch % self.args.save_period == 0:
-                    path = serving_dir / f"model_epo{epoch}.pth"
-                    print(f"{epoch} epochs done. Save model to {path}.")
-                    traced = self.text_generator.export_traced()
-                    torch.jit.save(traced, str(path))
+                path = serving_dir / f"model_epo{epoch}.pth"
+                print(f"{epoch} epochs done. Save model to {path}.")
+                traced = self.text_generator.export_traced()
+                torch.jit.save(traced, str(path))
 
         if self.args.checkpoint_root:
             saver = ModelCheckpointSaver(
@@ -276,10 +277,10 @@ class _CallbackCreator:
                         f.write(self.args.model_dump_json())
 
             @self.callback.on_epoch_end.register_hook
+            @_run_every(self.args.save_period)
             def save_model(epoch: int):
-                if epoch % self.args.save_period == 0:
-                    print(f"{epoch} epochs done.")
-                    saver.save(epoch)
+                print(f"{epoch} epochs done.")
+                saver.save(epoch)
 
         else:
             warnings.warn("`checkpoint_root` is not given. Training can't be restored!")
@@ -352,3 +353,15 @@ class _LazyFormatter[T]:
 def _print_samples(texts: t.Sequence[str], /):
     for i, line in enumerate(texts, 1):
         print(f"{i}.", line)
+
+
+def _run_every[**P](period: int) -> t.Callable[
+    [t.Callable[t.Concatenate[int, P], t.Any]],
+    t.Callable[t.Concatenate[int, P], None],
+]:
+    def decorater(f):
+        def wrapper(step: int, *args: P.args, **kwargs: P.kwargs):
+            if step % period == 0:
+                f(step, *args, **kwargs)
+        return wrapper
+    return decorater

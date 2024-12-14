@@ -5,10 +5,10 @@ import os
 import pathlib
 import typing as t
 
-import more_itertools
 import numpy as np
 import torch
 
+from core.losses import GeneratorLoss
 from core.models import Generator
 from core.models.sequence_modeling import TokenSequence
 from library.utils import cache_method_call, logging_indent
@@ -21,7 +21,7 @@ class Trainer(abc.ABC):
     def __init__(self, generator_updater: ModuleUpdater[Generator]):
         self.generator_updater = generator_updater
         self.generator = generator_updater.module
-        self.generator_losses = generator_updater.losses
+        self.generator_losses: t.Mapping[str, tuple[GeneratorLoss, float]] = generator_updater.losses
 
     @abc.abstractmethod
     def fit(self, data_loader: t.Iterable[np.ndarray], /):
@@ -95,31 +95,35 @@ class ModuleUpdater[T: torch.nn.Module]:
         self.optimizer = optimizer
         self.losses = losses
 
-        self.step = 0
+        self._step = 0
         self.optimizer_post_step_event = ListenableEvent[int]()
         self.loss_update_events = {
             k: ListenableEvent[int, float]()
             for k in losses.keys()
         }
 
+    @property
+    def step(self) -> int:
+        return self._step
+
     def update_step(self, sum_loss: torch.Tensor):
         self.optimizer.zero_grad()
         sum_loss.backward()
         self.optimizer.step()
+        self._step += 1
         self.optimizer_post_step_event(self.step)
-        self.step += 1
 
     def state_dict(self) -> dict:
         return {
             'module': self.module.state_dict(),
             'optimizer': self.optimizer.state_dict(),
+            'step': self.step,
         }
 
     def load_state_dict(self, state_dict: dict):
         self.module.load_state_dict(state_dict['module'])
         self.optimizer.load_state_dict(state_dict['optimizer'])
-        if op_state := state_dict['optimizer']['state']:
-            self.step = more_itertools.first(op_state.values())['step']
+        self._step = state_dict['step']
 
 
 class ModelCheckpointSaver:

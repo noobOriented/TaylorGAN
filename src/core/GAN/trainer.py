@@ -11,7 +11,7 @@ from core.models.sequence_modeling import TokenSequence
 from core.train import ModuleUpdater, Trainer
 from library.utils import cache_method_call
 
-from .discriminators import Discriminator
+from .discriminators import Discriminator, DiscriminatorLoss
 
 
 class GANTrainer(Trainer):
@@ -26,7 +26,7 @@ class GANTrainer(Trainer):
 
         self.discriminator_updater = discriminator_updater
         self.discriminator = discriminator_updater.module
-        self.discriminator_losses = discriminator_updater.losses
+        self.discriminator_losses: t.Mapping[str, tuple[DiscriminatorLoss, float]] = discriminator_updater.losses
         self.d_steps = d_steps
 
     def fit(self, data_loader: t.Iterable[np.ndarray], /):
@@ -54,8 +54,8 @@ class GANTrainer(Trainer):
     def _compute_discriminator_loss(self, real_samples: TokenSequence) -> torch.Tensor:
         fake_samples = self.generator.generate(real_samples.batch_size, real_samples.maxlen)
         losses = {
-            name: loss(self.discriminator, real_samples, fake_samples)
-            for name, (loss, _) in self.discriminator_losses.items()
+            name: loss_fn(self.discriminator, real_samples, fake_samples)
+            for name, (loss_fn, _) in self.discriminator_losses.items()
         }
         for name, loss_val in losses.items():
             self.discriminator_updater.loss_update_events[name](

@@ -23,7 +23,7 @@ class BLEUCalculator:
         verbose: bool = False,
         cache_dir: str | os.PathLike[str] | None =None,
     ):
-        self.eos_idx = self.INT_DTYPE(eos_idx)
+        self.eos_idx = eos_idx
         self.smoothing = smoothing
 
         references = np.asarray(references, dtype=self.INT_DTYPE)
