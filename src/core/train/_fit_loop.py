@@ -5,8 +5,9 @@ import typing as t
 import more_itertools
 import numpy.typing as npt
 
-from core.train.pubsub import ListenableEvent
 from library.utils import batch_generator
+
+from ._pubsub import ListenableEvent
 
 
 class DataLoader:

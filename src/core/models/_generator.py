@@ -1,11 +1,12 @@
 import abc
 import itertools
+
 import torch
 
-from core.preprocess import SpecialToken
 from library.torch_zoo.functions import random_choice_by_logits
+from preprocess import SpecialToken
 
-from .sequence_modeling import SampledTokenSequence, TokenSequence
+from ._types import SampledTokenSequence, TokenSequence
 
 
 class Generator(torch.nn.Module):

@@ -1,29 +1,29 @@
+from __future__ import annotations
+
 import os
+import random
+import typing as t
 
-from core.train import DataLoader, ModelCheckpointSaver
+import numpy as np
+import pydantic
+import torch
+
+from core.models import GeneratorConfigs
+from core.train import CallbackConfigs, DataLoader, ModelCheckpointSaver, TrainerConfigs
 from library.utils import format_highlight, logging_indent, parse_args_as
-from scripts.snippets import set_global_random_seed
-
-from ._configs import GANTrainingConfigs, MLETrainingConfigs
-
-
-def GAN_main():
-    configs = parse_args_as(GANTrainingConfigs)
-    main(configs)
-
-
-def MLE_main():
-    configs = parse_args_as(MLETrainingConfigs)
-    main(configs)
+from preprocess import DataConfigs
 
 
 def main(
-    configs: GANTrainingConfigs | MLETrainingConfigs,
+    configs: MainConfigs | None = None,
     base_tag: str | None = None,
     checkpoint: str | os.PathLike[str] | None = None,
 ):
+    if configs is None:
+        configs = parse_args_as(MainConfigs)
+
     with logging_indent("Set global random seed"):
-        set_global_random_seed(configs.random_seed)
+        _set_global_random_seed(configs.random_seed)
 
     with logging_indent("Preprocess data"):
         preprocessed_result = configs.load_data()
@@ -59,3 +59,21 @@ def main(
 
     print(format_highlight("Start Training"))
     trainer.fit(data_loader)
+
+
+def _set_global_random_seed(seed: int | None):
+    print(f"seed = {seed}")
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+
+
+class MainConfigs(TrainerConfigs, CallbackConfigs, DataConfigs, GeneratorConfigs):
+    epochs: t.Annotated[int, pydantic.Field(ge=1, description='number of training epochs.')] = 10_000
+    batch_size: t.Annotated[int, pydantic.Field(ge=1, description='size of data mini-batch.')] = 64
+    random_seed: t.Annotated[int | None, pydantic.Field(description='the global random seed.')] = None
+
+
+if __name__ == '__main__':
+    main()

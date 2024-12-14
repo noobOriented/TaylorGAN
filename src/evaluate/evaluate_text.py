@@ -2,10 +2,11 @@ import os
 import pathlib
 import typing as t
 
-from core.evaluate import BLEUCalculator, FEDCalculator, SmoothingFunction
-from core.preprocess import TextDataset
-from factories import data_factory
 from library.utils import parse_args_as, random_sample
+from preprocess import DataConfigs, TextDataset
+
+from .bleu import BLEUCalculator, SmoothingFunction
+from .fed import FEDCalculator
 
 
 # HUB_URL = "https://tfhub.dev/google/universal-sentence-encoder-large/3"
@@ -14,7 +15,7 @@ RLM_EPOCHS = 100
 
 
 def main():
-    class Args(data_factory.DataConfigs):
+    class Args(DataConfigs):
         eval_path: pathlib.Path
         bleu: int | None = None
         fed: int | None = None

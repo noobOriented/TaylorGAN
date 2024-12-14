@@ -6,12 +6,11 @@ import typing as t
 
 import torch
 
-from core.models.generators import Generator
-from core.models.sequence_modeling import TokenSequence
+from core.models import Generator, TokenSequence
 from library.torch_zoo.functions import gaussian, masked_reduce, pairwise_euclidean
 from library.utils import format_object
 
-from .discriminators import Discriminator
+from ._discriminator import Discriminator
 
 
 @dataclasses.dataclass
