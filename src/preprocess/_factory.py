@@ -17,7 +17,10 @@ CONFIG_PATH = 'datasets/corpus.yaml'
 
 class DataConfigs(pydantic.BaseModel):
     dataset: t.Annotated[str, pydantic.Field(description='the choice of corpus.')]
-    maxlen: t.Annotated[int | None, pydantic.Field(ge=1, description='the max length of sequence padding.')] = None
+    maxlen: t.Annotated[
+        int | None,
+        pydantic.Field(ge=1, description='the max length of sequence padding.'),
+    ] = None
     vocab_size: t.Annotated[
         int | None,
         pydantic.Field(ge=1, description='the maximum number of tokens. ordered by descending frequency.'),

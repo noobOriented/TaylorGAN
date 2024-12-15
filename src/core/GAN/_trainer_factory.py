@@ -29,11 +29,17 @@ from ._trainer import GANTrainer
 
 
 class GANTrainerConfigs(TrainerConfigs):
-    discriminator: str = "cnn(activation='elu')"
-    d_steps: t.Annotated[int, pydantic.Field(ge=1, description='update generator every n discriminator steps.')] = 1
-    d_regularizers: list[str] = []
+    discriminator: t.Annotated[
+        str,
+        pydantic.Field(validation_alias=pydantic.AliasChoices('d', 'discriminator')),
+    ] = "cnn(activation='elu')"
+    discriminator_losses: t.Annotated[
+        list[str],
+        pydantic.Field(validation_alias='d_loss'),
+    ] = []
     d_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
     d_fix_embeddings: bool = False
+    d_steps: t.Annotated[int, pydantic.Field(ge=1, description='update generator every n discriminator steps.')] = 1
 
     loss: t.Annotated[str, pydantic.Field(description='loss function pair of GAN.')] = 'RKL'
     estimator: t.Annotated[str, pydantic.Field(description='gradient estimator for discrete sampling.')] = 'taylor'
@@ -48,14 +54,14 @@ class GANTrainerConfigs(TrainerConfigs):
         g_losses: dict[str, tuple[GeneratorLoss, float]] = {
             self.loss: (objective, 1),
         }
-        for s in self.g_regularizers:
+        for s in self.generator_losses:
             (reg, coeff), info = _G_REGS(s, return_info=True)
             g_losses[info.func_name] = (reg, coeff)
 
         d_losses: dict[str, tuple[DiscriminatorLoss, float]] = {
             'BCE': (self._loss_tuple.discriminator_loss, 1),
         }
-        for s in self.d_regularizers:
+        for s in self.discriminator_losses:
             (reg, coeff), info = _D_REGS(s, return_info=True)
             d_losses[info.func_name] = (reg, coeff)
 

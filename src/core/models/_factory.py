@@ -12,7 +12,10 @@ from ._generator import AutoRegressiveGenerator, Generator
 
 
 class GeneratorConfigs(pydantic.BaseModel):
-    generator: str = 'gru'
+    generator: t.Annotated[
+        str,
+        pydantic.Field(validation_alias=pydantic.AliasChoices('g', 'generator')),
+    ] = 'gru'
     tie_embeddings: t.Annotated[
         bool,
         pydantic.Field(description="whether to tie the weights of generator's input/presoftmax embeddings."),

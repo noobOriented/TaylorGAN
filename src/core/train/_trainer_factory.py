@@ -14,11 +14,14 @@ from ._trainer import GeneratorTrainer
 
 class TrainerConfigs(pydantic.BaseModel):
     g_optimizer: str = 'adam(lr=1e-4,betas=(0.5, 0.999),clip_norm=10)'
-    g_regularizers: list[str] = []
+    generator_losses: t.Annotated[
+        list[str],
+        pydantic.Field(alias='g_loss'),
+    ] = []
 
     def get_trainer(self, data: PreprocessResult, generator: Generator):
         losses: dict[str, tuple[GeneratorLoss, float]] = {}
-        for s in self.g_regularizers:
+        for s in self.generator_losses:
             (reg, coeff), info = _G_REGS(s, return_info=True)
             losses[info.func_name] = (reg, coeff)
 

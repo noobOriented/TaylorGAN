@@ -2,7 +2,9 @@ import os
 import pathlib
 import typing as t
 
-from library.utils import parse_args_as, random_sample
+from pydantic_settings import CliApp
+
+from library.utils import random_sample
 from preprocess import DataConfigs, TextDataset
 
 from .bleu import BLEUCalculator, SmoothingFunction
@@ -20,7 +22,7 @@ def main():
         bleu: int | None = None
         fed: int | None = None
 
-    args = parse_args_as(Args)
+    args = CliApp.run(Args)
     preprocessed_result = args.load_data()
     tokenizer = preprocessed_result.tokenizer
 
