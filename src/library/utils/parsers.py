@@ -44,6 +44,9 @@ class LookUpCall[T]:
     def __init__(self, choices: t.Mapping[str, t.Callable[..., T]]):
         self.choices = choices
 
+    def parse(self, s: str | T) -> T:
+        return self(s) if isinstance(s, str) else s
+
     @t.overload
     def __call__(self, arg_string: str, return_info: t.Literal[True]) -> tuple[T, ArgumentInfo]:
         ...

@@ -1,9 +1,10 @@
+from __future__ import annotations
+
+import functools
 import typing as t
-from functools import partial
 
 import pydantic
 import torch
-from torch.nn import Embedding, GRUCell, Linear, Sequential
 
 from library.utils import LookUpCall
 from preprocess import PreprocessResult
@@ -13,7 +14,7 @@ from ._generator import AutoRegressiveGenerator, Generator
 
 class GeneratorConfigs(pydantic.BaseModel):
     generator: t.Annotated[
-        str,
+        GeneratorCellFactory,
         pydantic.Field(validation_alias=pydantic.AliasChoices('g', 'generator')),
     ] = 'gru'
     tie_embeddings: t.Annotated[
@@ -25,34 +26,39 @@ class GeneratorConfigs(pydantic.BaseModel):
     def get_generator(self, data: PreprocessResult) -> Generator:
         print(f"Create generator: {self.generator}")
 
-        embedder = Embedding.from_pretrained(
+        embedder = torch.nn.Embedding.from_pretrained(
             torch.from_numpy(data.embedding_matrix),
             padding_idx=data.special_tokens.PAD.idx,
             freeze=self.g_fix_embeddings,
         )
-        presoftmax_layer = Linear(embedder.embedding_dim, embedder.num_embeddings)
+        presoftmax_layer = torch.nn.Linear(embedder.embedding_dim, embedder.num_embeddings)
         if self.tie_embeddings:
             presoftmax_layer.weight = embedder.weight
         else:
             presoftmax_layer.weight.data.copy_(embedder.weight)
 
-        cell = _G_MODELS(self.generator)(embedder.embedding_dim)
+        cell = self.generator(embedder.embedding_dim)
         return AutoRegressiveGenerator(
             cell=cell,
             embedder=embedder,
-            output_layer=Sequential(
-                Linear(cell.hidden_size, embedder.embedding_dim, bias=False),
+            output_layer=torch.nn.Sequential(
+                torch.nn.Linear(
+                    cell.hidden_size, 
+                    embedder.embedding_dim,
+                    bias=False,
+                ),
                 presoftmax_layer,
             ),
             special_tokens=data.special_tokens,
         )
 
 
-def gru_cell(units: int = 1024):
-    return partial(GRUCell, hidden_size=units)
-
-
 _G_MODELS = LookUpCall({
-    'gru': gru_cell,
-    'test': lambda: partial(GRUCell, hidden_size=10),
+    'gru': lambda hidden_size=1024: functools.partial(torch.nn.GRUCell, hidden_size=hidden_size),
+    'test': lambda hidden_size=10: functools.partial(torch.nn.GRUCell, hidden_size=hidden_size),
 })
+GeneratorCellFactory = t.Annotated[
+    t.Callable[[int], torch.nn.Module],
+    pydantic.PlainValidator(_G_MODELS.parse),
+]
+GeneratorConfigs.model_rebuild()

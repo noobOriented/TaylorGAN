@@ -15,8 +15,25 @@ from ._preprocessors import PreprocessResult, TextDataset, Tokenizer
 CONFIG_PATH = 'datasets/corpus.yaml'
 
 
+def _load_corpus_config() -> dict[str, CorpusConfig]:
+    with open(CONFIG_PATH) as f:
+        d: dict = yaml.safe_load(f)
+
+    d = {k: v for k, v in d.items() if not k.startswith('.')}
+    for k, v in d.items():
+        v['name'] = k
+
+    return pydantic.TypeAdapter(dict[str, CorpusConfig]).validate_python(d)
+
+
+_corpus_config = _load_corpus_config()
+
+
 class DataConfigs(pydantic.BaseModel):
-    dataset: t.Annotated[str, pydantic.Field(description='the choice of corpus.')]
+    dataset: t.Annotated[
+        t.Literal[tuple(_corpus_config.keys())],
+        pydantic.Field(description='the choice of corpus.'),
+    ]
     maxlen: t.Annotated[
         int | None,
         pydantic.Field(ge=1, description='the max length of sequence padding.'),
@@ -71,13 +88,13 @@ class DataConfigs(pydantic.BaseModel):
 
     @functools.cached_property
     def _corpus_config(self):
-        d = {'name': self.dataset, 'maxlen': self.maxlen, 'vocab_size': self.vocab_size}
-        with open(CONFIG_PATH) as f:
-            d |= yaml.safe_load(f)[self.dataset]
-    
-        c = CorpusConfig(**d)
+        c = _corpus_config[self.dataset]
         if not ('train' in c.path and all(p.exists() for p in c.path.values())):
             raise KeyError  # TODO else warning?
+        if self.maxlen:
+            c.maxlen = self.maxlen
+        if self.vocab_size:
+            c.vocab_size = self.vocab_size
         return c
 
     @functools.cached_property
