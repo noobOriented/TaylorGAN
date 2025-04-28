@@ -277,7 +277,7 @@ class _CallbackCreator:
                 saver.directory.mkdir(exist_ok=True)
                 if not self.checkpoint:
                     with open(saver.directory / 'args', 'w') as f:
-                        f.write(self.args.model_dump_json())
+                        f.write(self.args.model_dump_json(by_alias=True, exclude_defaults=True))
 
             @self.callback.on_epoch_end.register_hook
             @_run_every(self.args.save_period)

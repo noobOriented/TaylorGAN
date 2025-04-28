@@ -6,7 +6,8 @@ import typing as t
 
 import torch
 
-from core.models import Generator, TokenSequence
+from core.models import TokenSequence
+from core.train import GeneratorLoss
 from library.torch_zoo.functions import gaussian, masked_reduce, pairwise_euclidean
 from library.utils import format_object
 
@@ -14,12 +15,12 @@ from ._discriminator import Discriminator
 
 
 @dataclasses.dataclass
-class GANObjective:
+class GANObjective(GeneratorLoss):
     discriminator: Discriminator
     generator_loss: t.Callable[[torch.Tensor], torch.Tensor]
     estimator: GANEstimator
 
-    def __call__(self, generator: Generator, real_samples: TokenSequence):
+    def __call__(self, generator, real_samples):
         fake_samples = generator.generate(real_samples.batch_size, real_samples.maxlen)
         return self.estimator.compute_loss(
             fake_samples,

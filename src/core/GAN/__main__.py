@@ -1,11 +1,12 @@
+from pydantic_settings import CliApp
+
 import core.main
-from library.utils import parse_args_as
 
 from ._trainer_factory import GANTrainerConfigs
 
 
 def main():
-    configs = parse_args_as(GANMainConfigs)
+    configs = CliApp.run(GANMainConfigs)
     core.main.main(configs)
 
 

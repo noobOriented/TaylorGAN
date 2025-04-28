@@ -7,10 +7,11 @@ import typing as t
 import numpy as np
 import pydantic
 import torch
+from pydantic_settings import CliApp
 
 from core.models import GeneratorConfigs
 from core.train import CallbackConfigs, DataLoader, ModelCheckpointSaver, TrainerConfigs
-from library.utils import format_highlight, logging_indent, parse_args_as
+from library.utils import format_highlight, logging_indent
 from preprocess import DataConfigs
 
 
@@ -20,7 +21,7 @@ def main(
     checkpoint: str | os.PathLike[str] | None = None,
 ):
     if configs is None:
-        configs = parse_args_as(MainConfigs)
+        configs = CliApp.run(MainConfigs)
 
     with logging_indent("Set global random seed"):
         _set_global_random_seed(configs.random_seed)
@@ -71,7 +72,14 @@ def _set_global_random_seed(seed: int | None):
 
 class MainConfigs(TrainerConfigs, CallbackConfigs, DataConfigs, GeneratorConfigs):
     epochs: t.Annotated[int, pydantic.Field(ge=1, description='number of training epochs.')] = 10_000
-    batch_size: t.Annotated[int, pydantic.Field(ge=1, description='size of data mini-batch.')] = 64
+    batch_size: t.Annotated[
+        int,
+        pydantic.Field(
+            ge=1,
+            description='size of data mini-batch.',
+            validation_alias=pydantic.AliasChoices('b', 'batch_size')
+        ),
+    ] = 64
     random_seed: t.Annotated[int | None, pydantic.Field(description='the global random seed.')] = None
 
 

@@ -44,13 +44,12 @@ class TestTrain:
         with patch(
             'sys.argv',
             ' '.join([
-                '... --data test',
-                '--gen test --dis test --estimator taylor',
-                '--g-op sgd(1e-3,clip_norm=1) --g-reg entropy(1e-5)',
-                '--d-op sgd(1e-3,clip_norm=1) --d-reg grad_penalty(10) spectral(0.1) embedding(0.1)',
-                '--epochs 4 --batch 2',
+                '... --dataset test',
+                '-g test --g-optimizer sgd(1e-3,clip_norm=1) --g-loss entropy(1e-5) --estimator taylor',
+                '-d test --d-optimizer sgd(1e-3,clip_norm=1) --d-loss grad_penalty(10) --d-loss spectral(0.1) --d-loss embedding(0.1)',
+                '--epochs 4 -b 2',
                 '--bleu 2',
-                f'--serv {serving_root} --checkpoint {checkpoint_root} --save-period 2',
+                f'--serving-root {serving_root} --checkpoint-root {checkpoint_root} --save-period 2',
             ]).split(),
         ):
             core.GAN.__main__.main()
@@ -59,10 +58,10 @@ class TestTrain:
         with patch(
             'sys.argv',
             ' '.join([
-                '... --data test',
-                '--gen test --g-op sgd(1e-3)',
-                '--epochs 4 --batch 2',
-                f'--serv {serving_root} --checkpoint {checkpoint_root} --save-period 2',
+                '... --dataset test',
+                '-g test --g-optimizer sgd(1e-3)',
+                '--epochs 4 -b 2',
+                f'--serving-root {serving_root} --checkpoint-root {checkpoint_root} --save-period 2',
             ]).split(),
         ):
             core.MLE.main()
@@ -109,10 +108,10 @@ class TestEvaluate:
     @pytest.mark.dependency(name='perplexity', depends=['save_serving'])
     def test_perplexity(self, serving_root: pathlib.Path):
         model_path = min(serving_root.iterdir()) / 'model_epo4.pth'
-        with patch('sys.argv', f'... --model {model_path} --data test'.split()):
+        with patch('sys.argv', f'... --model-path {model_path} --dataset test'.split()):
             perplexity.main()
 
     def test_evaluate_text(self, data_dir: pathlib.Path):
         corpus_path = data_dir / 'train.txt'
-        with patch('sys.argv', f'... --eval {corpus_path} --data test --bleu 5'.split()):
+        with patch('sys.argv', f'... --eval-path {corpus_path} --dataset test --bleu 5'.split()):
             evaluate_text.main()

@@ -2,8 +2,8 @@ import pathlib
 import typing as t
 
 import pydantic
+from pydantic_settings import CliApp
 
-from library.utils import parse_args_as
 from preprocess import DataConfigs
 
 from .generator_executor import TextGenerator
@@ -14,7 +14,7 @@ def main():
     class Args(DataConfigs):
         model_path: t.Annotated[pathlib.Path, pydantic.Field(description='path of serving model folder.')]
 
-    args = parse_args_as(Args)
+    args = CliApp.run(Args)
     preprocessed_result = args.load_data()
     generator = TextGenerator.load_traced(args.model_path, tokenizer=preprocessed_result.tokenizer)
     for tag, dataset in preprocessed_result.dataset.items():
